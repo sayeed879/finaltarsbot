@@ -14,6 +14,7 @@ class User:
     premium_expiry_date: Optional[any] # Will be a datetime object
     ai_limit_remaining: int
     pdf_downloads_remaining: int
+    pdf_downloads_reset_date: Optional[any] # Will be a datetime object
 
 async def get_user(pool: asyncpg.Pool, user_id: int) -> Optional[User]:
     """
