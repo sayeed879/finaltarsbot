@@ -3,6 +3,8 @@ import logging
 from dotenv import load_dotenv
 
 # --- Load Environment Variables ---
+# This loads from a .env file only for local testing.
+# Railway uses its own variable system.
 load_dotenv()
 
 # --- Bot and Admin ---
@@ -27,16 +29,17 @@ if not CHANNEL_ID:
     logging.critical("CHANNEL_ID is not set in the .env file (e.g., @mychannel)")
     raise ValueError("CHANNEL_ID is not set in the .env file")
 
-#
-# (in bot/config.py)
 
 # --- Database Configuration ---
+# This is the line that caused your error.
+# It means Railway did not provide the "DATABASE_URL" variable.
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     logging.critical("DATABASE_URL is not set! You must provide the full PostgreSQL URL")
     raise ValueError("DATABASE_URL must be set in format: postgresql://user:pass@host:port/dbname")
 
 # --- Redis Configuration ---
+# This will be your next error if you don't add a Redis service.
 REDIS_URL = os.getenv("REDIS_URL")
 if not REDIS_URL:
     logging.critical("REDIS_URL is not set! You must provide the full Redis URL")
@@ -52,7 +55,8 @@ except Exception as e:
     raise ValueError("Invalid REDIS_URL format")
 
 # --- Webhook Configuration ---
-BASE_WEBHOOK_URL = os.getenv("BASE_WEBHOOK_URL", "https://finaltarsbot-production.up.railway.app")
+# This is provided automatically by Railway
+BASE_WEBHOOK_URL = os.getenv("BASE_WEBHOOK_URL", "https://your-default-webhook-url.com")
 if not BASE_WEBHOOK_URL:
     logging.critical("BASE_WEBHOOK_URL is not set! You must provide the base URL for webhooks")
     raise ValueError("BASE_WEBHOOK_URL must be set (e.g., https://your-domain.com)")
