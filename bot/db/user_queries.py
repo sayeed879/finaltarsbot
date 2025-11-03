@@ -15,7 +15,8 @@ class User:
     ai_limit_remaining: int
     pdf_downloads_remaining: int
     pdf_downloads_reset_date: Optional[any] # Will be a datetime object
-
+    first_seen: Optional[any]               # <-- YOU WERE MISSING THIS
+    last_active: Optional[any]
 async def get_user(pool: asyncpg.Pool, user_id: int) -> Optional[User]:
     """
     Fetches a user from the database by their user_id.
