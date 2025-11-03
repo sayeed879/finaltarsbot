@@ -44,7 +44,6 @@ async def on_startup(app: web.Application):
     dp["ai_cache"] = ai_cache_redis
     
     # 4. Set the webhook with Telegram
-# 4. Set the webhook with Telegram
     try:
         await bot.set_webhook(
             url=WEBHOOK_URL,
@@ -54,6 +53,13 @@ async def on_startup(app: web.Application):
     except Exception as e:
         # This is NORMAL if you have multiple workers
         logging.warning(f"Failed to set webhook (this is OK if another worker succeeded): {e}")
+
+async def on_shutdown(app: web.Application):
+    """
+    Called when the aiohttp server shuts down.
+    """
+    logging.info("AIOHTTP server shutting down...")
+    
     # 1. Get resources from the app
     bot: Bot = app["bot"]
     dp: Dispatcher = app["dp"]
