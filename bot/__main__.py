@@ -19,7 +19,7 @@ from bot.handlers import all_handlers_router
 from bot.middleware.activity import UserActivityMiddleware
 
 # --- Webhook Configuration ---
-WEBHOOK_PATH = f"/webhook/{BOT_TOKEN}"
+WEBHOOK_PATH = f"/webhook/{7953333536:AAGZSd7EgJmcOfU8jnpaCqQc9IFq6inGt-c}"
 WEBHOOK_SECRET = "TarsBotWebhookSecret2025"  # Safe webhook secret
 WEBHOOK_URL = f"{BASE_WEBHOOK_URL.rstrip('/')}{WEBHOOK_PATH}"  # Ensure clean URL
 
