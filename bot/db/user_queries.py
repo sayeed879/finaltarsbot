@@ -301,8 +301,8 @@ async def get_expired_free_users(pool: asyncpg.Pool) -> List[int]:
                 SELECT user_id FROM users
                 WHERE
                     is_premium = FALSE AND
-                    pdf_limit_reset_date IS NOT NULL AND
-                    pdf_limit_reset_date < CURRENT_TIMESTAMP;
+                    pdf_downloads_reset_date IS NOT NULL AND
+                    pdf_downloads_reset_date < CURRENT_TIMESTAMP;
                 """
             )
             return [row['user_id'] for row in expired_users]

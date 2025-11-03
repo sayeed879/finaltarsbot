@@ -27,7 +27,7 @@ Upgrade for just <b>₹{UPGRADE_PRICE} for 30 days</b> and get:
 Click a button below to get the payment QR code.
 """
 
-PAYMENT_QR_CODE_FILE_ID = "YOUR_QR_CODE_FILE_ID" # IMPORTANT!
+PAYMENT_QR_CODE_FILE_ID = "AgACAgUAAxkBAAEYsCBpBKYY1sBTMkWbLvrCDyaE2HgQGAACAw9rGwvQKFQFpXe3ZEZeWAEAAwIAA3kAAzYE" # IMPORTANT!
 
 # --- 1. Trigger the upgrade (from command or button) ---
 @router.message(Command(commands=["upgrade"]))
@@ -57,16 +57,7 @@ async def send_payment_details(callback: CallbackQuery, fsm_context: FSMContext)
     # 1. Send your QR code image to your bot in a private chat.
     # 2. The bot will send you a JSON error (since no handler is set).
     # 3. In that JSON, find the "photo" section, and get the "file_id"
-    #    (it's a long string).
-    # 4. Paste that file_id into 'PAYMENT_QR_CODE_FILE_ID' above.
-    if PAYMENT_QR_CODE_FILE_ID == "AgACAgUAAxkBAAEYsCBpBKYY1sBTMkWbLvrCDyaE2HgQGAACAw9rGwvQKFQFpXe3ZEZeWAEAAwIAA3kAAzYE":
-        logging.critical("PAYMENT_QR_CODE_FILE_ID is not set!")
-        await callback.answer(
-            "Error: Payment system is not configured. Please contact admin.",
-            show_alert=True
-        )
-        return
-    
+    #    (it's a long string).user_id = callback.from_user.id
     user_id = callback.from_user.id
     username = callback.from_user.username or "N/A"
     

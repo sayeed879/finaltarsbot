@@ -39,8 +39,8 @@ def initialize_ai_model():
         genai.configure(api_key=GEMINI_API_KEY)
         # Try to initialize Flash model first
         try:
-            MODEL = genai.GenerativeModel('gemini-pro', generation_config=generation_config)
-            logging.info("Successfully initialized Gemini Pro model")
+            MODEL = genai.GenerativeModel('gemini-2.5-flash', generation_config=generation_config)
+            logging.info("Successfully initialized Gemini flash model")
             return True
         except Exception as e:
             logging.error(f"Failed to initialize Gemini model: {e}")

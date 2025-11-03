@@ -70,6 +70,7 @@ async def setup_database_tables(pool: asyncpg.Pool):
                 premium_expiry_date TIMESTAMPTZ,
                 ai_limit_remaining INT NOT NULL DEFAULT 10,
                 pdf_downloads_remaining INT NOT NULL DEFAULT 10,
+                 pdf_downloads_reset_date TIMESTAMPTZ,
                 first_seen TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
                 last_active TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
             );
