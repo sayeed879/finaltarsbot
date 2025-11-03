@@ -1,0 +1,21 @@
+# Core bot framework with pydantic support
+aiogram[pydantic]==3.3.0
+
+# AI and Machine Learning
+google-generativeai>=0.8.0
+google-api-core>=2.15.0  # For retry logic
+google-auth>=2.27.0      # For authentication
+
+# Database and Caching
+asyncpg==0.29.0
+redis==5.0.1
+
+# HTTP and Server
+aiohttp==3.9.1
+gunicorn==21.2.0
+
+# Utilities
+python-dotenv==1.0.1
+pydantic>=2.0.0
+typing-extensions>=4.8.0
+python-magic==0.4.27

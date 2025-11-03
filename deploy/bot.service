@@ -1,0 +1,25 @@
+[Unit]
+Description=High-Performance Telegram Bot
+After=network.target postgresql.service redis.service
+
+[Service]
+# --- Replace with your actual paths ---
+User=your_linux_user
+Group=your_linux_user
+WorkingDirectory=/home/your_linux_user/my_telegram_bot
+
+# --- Command to start the bot ---
+# It runs gunicorn, which runs your bot.
+# Make sure the path to gunicorn (in your venv) is correct.
+ExecStart=/home/your_linux_user/my_telegram_bot/venv/bin/gunicorn -c deploy/gunicorn_config.py bot:app
+
+# --- Environment Secrets ---
+# This is a secure way to load your secrets from the .env file
+EnvironmentFile=/home/your_linux_user/my_telegram_bot/.env
+
+# --- Auto-Restart ---
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
