@@ -16,8 +16,8 @@ from bot.db import user_queries, ai_queries
 from bot.config import GEMINI_API_KEY, ADMIN_ID
 
 router = Router()
-MAX_HISTORY_MESSAGES = 6  # Increased from 4 to 6 for better context
-MAX_INPUT_CHARS = 2000  # Increased from 1000 to 2000
+MAX_HISTORY_MESSAGES = 4  # Increased from 4 to 6 for better context
+MAX_INPUT_CHARS = 1000  # Increased from 1000 to 2000
 CACHE_EXPIRY = 7200  # 2 hours cache expiry
 
 # Initialize the model globally
@@ -26,7 +26,7 @@ generation_config = GenerationConfig(
     temperature=0.7,
     top_p=0.95,
     top_k=40,
-    max_output_tokens=400,  # Increased from 250 for more detailed responses
+    max_output_tokens=250,  # Increased from 250 for more detailed responses
 )
 
 def initialize_ai_model():
@@ -41,7 +41,7 @@ def initialize_ai_model():
         # Try to initialize Flash model
         try:
             MODEL = genai.GenerativeModel(
-                'gemini-2.0-flash-exp',  # Updated to latest model
+                'gemini-2.5-flash-exp',  # Updated to latest model
                 generation_config=generation_config,
                 safety_settings={
                     'HARASSMENT': 'BLOCK_NONE',
@@ -50,7 +50,7 @@ def initialize_ai_model():
                     'DANGEROUS_CONTENT': 'BLOCK_NONE',
                 }
             )
-            logging.info("✅ Successfully initialized Gemini 2.0 Flash model")
+            logging.info("✅ Successfully initialized Gemini Flash model")
             return True
         except Exception as e:
             logging.error(f"Failed to initialize Gemini model: {e}")
@@ -106,7 +106,7 @@ async def call_my_ai_api(
         conversation = []
         
         # Add system instructions
-        system_instruction = f"{system_prompt}\n\nImportant: Keep responses concise but informative. Aim for 150-300 words unless more detail is specifically requested."
+        system_instruction = f"{system_prompt}\n\nImportant: Keep responses concise but informative. Aim for less than 100 words unless more detail is specifically requested."
         
         conversation.append({
             "role": "user",
