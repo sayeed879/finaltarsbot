@@ -19,7 +19,7 @@ from bot.handlers import all_handlers_router
 from bot.middleware.activity import UserActivityMiddleware
 
 # --- Webhook Configuration ---
-WEBHOOK_PATH = "/webhook/"
+WEBHOOK_PATH = f"/webhook/{BOT_TOKEN}"
 WEBHOOK_SECRET = "TarsBotWebhookSecret2025"  # Safe webhook secret
 WEBHOOK_URL = f"{BASE_WEBHOOK_URL.rstrip('/')}{WEBHOOK_PATH}"  # Ensure clean URL
 
@@ -140,7 +140,7 @@ def create_app() -> web.Application:
         dp, 
         bot=bot, 
         secret_token=WEBHOOK_SECRET,
-        webhook_path=WEBHOOK_PATH
+        webhook_path="/webhook/"  # <-- THIS IS THE CORRECTED LINE
     )
 
     logging.info("AIOHTTP application configured successfully.")
