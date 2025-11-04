@@ -513,3 +513,5 @@ async def broadcast_message_received(message: Message, state: FSMContext, db_poo
     )
     
     logging.info(f"Broadcast complete: {success_count}/{total_users} successful")
+     
+    return False

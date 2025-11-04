@@ -394,4 +394,7 @@ async def handle_ai_prompt(
     logging.info(
         f"User {user_id} AI query processed. "
         f"Remaining: {user.ai_limit_remaining if not user.is_premium else 'unlimited'}"
-    )
+    ) 
+     
+     
+    return False

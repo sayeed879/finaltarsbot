@@ -391,3 +391,5 @@ async def send_pdf_link(callback: CallbackQuery, db_pool):
             show_alert=True
         )
         logging.error(f"PDF {pdf_id} not found in database")
+
+    

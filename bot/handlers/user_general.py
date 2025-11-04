@@ -277,3 +277,5 @@ async def handle_general_text(message: Message, db_pool):
             "Happy to help. Let me know if you need anything else!\n\n"
             "Use /help if you have questions."
         )
+
+        return False
