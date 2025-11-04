@@ -13,6 +13,7 @@ all_handlers_router = Router()
 
 # --- ORDER IS CRITICAL ---
 # 1. Admin commands (highest priority)
+all_handlers_router.include_router(user_start.router)
 all_handlers_router.include_router(admin.router)
 
 # 2. User start and command handlers
