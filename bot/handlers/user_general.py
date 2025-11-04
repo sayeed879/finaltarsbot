@@ -121,7 +121,3 @@ async def handle_general_text(message: Message, db_pool): # Renamed function
             "I'm not sure what you mean. Please use the buttons "
             "or type /help to see available commands."
         )
-    
-    # If no trigger is matched, this handler does nothing,
-    # and the message will be handled by the 'unknown_message'
-    # handler in your __init__.py file (which just passes).

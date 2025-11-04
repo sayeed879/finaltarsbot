@@ -26,11 +26,4 @@ all_handlers_router.include_router(payment.router)
 # 4. General text handlers (MUST BE AFTER BUTTONS)
 all_handlers_router.include_router(user_general.router)
 
-# 5. Final fallback for any message not caught
-@all_handlers_router.message()
-async def unknown_message(message: Message):
-    # (You could also add a db_pool and update last_active)
-    await message.answer(
-        "I'm not sure what you mean. Please use the buttons "
-        "or type /help to see available commands."
-    )
+# 5. Final fallback for any message not caughtgit
