@@ -8,31 +8,39 @@ from aiogram.fsm.context import FSMContext
 from bot.keyboards.reply import get_main_menu_keyboard
 from bot.db import user_queries
 
-# We create another Router for this file
-router = Router()
+# Assuming 'router' is defined here or imported
+router = Router() 
+# ... (rest of your imports) ...
 
 # --- Handler for the /stop command ---
-# This handler will catch /stop from ANY state
 @router.message(Command(commands=["stop"]))
 async def handle_stop(message: Message, fsm_context: FSMContext, db_pool):
-    await user_queries.update_user_last_active(db_pool, message.from_user.id)
+    user_id = message.from_user.id
     
-    # Check if the user is in any state
+    # Update last active time (Good practice)
+    await user_queries.update_user_last_active(db_pool, user_id)
+    
+    # 1. Get the current state
     current_state = await fsm_context.get_state()
-    if current_state is not None:
-        # If they are, clear the state
+    
+    # 2. Check if the user is in ANY state
+    if current_state:
+        # 3. Clear the state: This is the core action
         await fsm_context.clear()
+        
+        # 4. Acknowledge and present the main menu
         await message.answer(
-            "Your current action has been cancelled.",
+            "🛑 **Action Cancelled.** You are now back in the main menu.",
             reply_markup=get_main_menu_keyboard()
         )
     else:
-        # If not in a state, just send a confirmation
+        # If not in a state, just send a confirmation (Good fallback)
         await message.answer(
-            "You are not in any active mode. Here is the main menu.",
+            "You weren't in any active operation. Here is the main menu.",
             reply_markup=get_main_menu_keyboard()
         )
 
+# ... (rest of the file content
 # --- Handler for the /help command ---
 # This also handles the "🆘 /help" button click
 @router.message(Command(commands=["help"]))

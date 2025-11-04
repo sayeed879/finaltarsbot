@@ -26,6 +26,5 @@ all_handlers_router.include_router(payment.router)
 
 # 4. General text handlers (MUST BE AFTER BUTTONS)
 all_handlers_router.include_router(user_general.router)
-all_handlers_router.include_router(user_stop.router)
 
 # 5. Final fallback for any message not caughtgit
