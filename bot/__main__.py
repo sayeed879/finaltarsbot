@@ -124,16 +124,13 @@ def create_app() -> web.Application:
         }
     )
     
-    # Initialize dispatcher with FSM strategy
-    dp = Dispatcher(
-        storage=fsm_storage,
-        fsm_strategy=FSMStrategy.USER_IN_CHAT
-    )
+    # Initialize dispatcher with FSM storage
+    dp = Dispatcher(storage=fsm_storage)
 
     # Make the bot instance available to all middleware and handlers
     dp["bot"] = bot
 
-    # 2. Register all middleware in correct order
+    # 2. Register middleware
     dp.update.outer_middleware(UserActivityMiddleware())
     dp.update.middleware(ThrottlingMiddleware())
     dp.update.middleware(DBSessionMiddleware())
