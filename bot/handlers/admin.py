@@ -15,11 +15,19 @@ from bot.keyboards import inline as inline_keyboards
 
 # --- Admin-Only Filter ---
 class AdminFilter(Filter):
-    async def __call__(self, message: Message) -> bool:
-        return message.from_user.id == ADMIN_ID
+    async def __call__(self, event) -> bool:
+        if isinstance(event, Message):
+            user_id = event.from_user.id
+        elif isinstance(event, CallbackQuery):
+            user_id = event.from_user.id
+        else:
+            return False
+        return user_id == ADMIN_ID
 
 router = Router()
+# Apply filter to both messages and callback queries
 router.message.filter(AdminFilter())
+router.callback_query.filter(AdminFilter())
 
 # --- Helper Function for Parsing Commands ---
 def parse_command(text: str) -> Tuple[str, Optional[str]]:
@@ -136,7 +144,7 @@ async def admin_delete_pdf(message: Message, db_pool):
     )
 
 @router.callback_query(F.data.startswith("del_select:"))
-async def admin_select_pdf_to_delete(callback: CallbackQuery, fsm_context: FSMContext):
+async def admin_select_pdf_to_delete(callback: CallbackQuery, state: FSMContext):
     pdf_id = int(callback.data.split(":")[1])
     
     pdf_title = ""
@@ -145,8 +153,8 @@ async def admin_select_pdf_to_delete(callback: CallbackQuery, fsm_context: FSMCo
             pdf_title = button[0].text
             break
     
-    await fsm_context.set_state(AdminFlow.DeletePDF_AwaitingConfirmation)
-    await fsm_context.update_data(pdf_id=pdf_id, pdf_title=pdf_title)
+    await state.set_state(AdminFlow.DeletePDF_AwaitingConfirmation)
+    await state.update_data(pdf_id=pdf_id, pdf_title=pdf_title)
     
     await callback.message.edit_text(
         f"Are you sure you want to permanently delete this file?\n\n"
@@ -157,10 +165,10 @@ async def admin_select_pdf_to_delete(callback: CallbackQuery, fsm_context: FSMCo
     await callback.answer()
 
 @router.callback_query(AdminFlow.DeletePDF_AwaitingConfirmation, F.data.startswith("del_confirm:"))
-async def admin_confirm_delete(callback: CallbackQuery, fsm_context: FSMContext, db_pool):
+async def admin_confirm_delete(callback: CallbackQuery, state: FSMContext, db_pool):
     pdf_id = int(callback.data.split(":")[1])
     
-    data = await fsm_context.get_data()
+    data = await state.get_data()
     pdf_title = data.get('pdf_title', f"ID: {pdf_id}")
     
     success = await pdf_queries.delete_pdf_by_id(db_pool, pdf_id)
@@ -170,13 +178,13 @@ async def admin_confirm_delete(callback: CallbackQuery, fsm_context: FSMContext,
     else:
         await callback.message.edit_text(f"❌ Error: Could not delete <b>{pdf_title}</b>.")
         
-    await fsm_context.clear()
+    await state.clear()
     await callback.answer()
 
 @router.callback_query(F.data == "del_cancel")
-async def admin_cancel_delete(callback: CallbackQuery, fsm_context: FSMContext):
-    if await fsm_context.get_state() is not None:
-        await fsm_context.clear()
+async def admin_cancel_delete(callback: CallbackQuery, state: FSMContext):
+    if await state.get_state() is not None:
+        await state.clear()
         
     await callback.message.edit_text("❌ Deletion cancelled.")
     await callback.answer()
@@ -184,11 +192,11 @@ async def admin_cancel_delete(callback: CallbackQuery, fsm_context: FSMContext):
 # --- Admin: Broadcast ---
 
 @router.message(Command(commands=["broadcast"]))
-async def admin_broadcast(message: Message, fsm_context: FSMContext):
+async def admin_broadcast(message: Message, state: FSMContext):
     command, arg = parse_command(message.text)
     
     if not arg:
-        await fsm_context.set_state(AdminFlow.AwaitingBroadcastMessage)
+        await state.set_state(AdminFlow.AwaitingBroadcastMessage)
         await message.answer(
             "OK, send me the message you want to broadcast. "
             "It can be text, photo, or a document.\n\nType /stop to cancel."
@@ -197,7 +205,7 @@ async def admin_broadcast(message: Message, fsm_context: FSMContext):
         await message.answer("Broadcasting with a message like `/broadcast Hello` is not set up yet. Use just `/broadcast`.")
 
 @router.message(AdminFlow.AwaitingBroadcastMessage)
-async def broadcast_message_received(message: Message, fsm_context: FSMContext, db_pool):
-    await fsm_context.clear()
+async def broadcast_message_received(message: Message, state: FSMContext, db_pool):
+    await state.clear()
     await message.answer("Broadcast message received. (Logic to send to all users is not yet built).")
     logging.info("Broadcast message captured but not sent.")

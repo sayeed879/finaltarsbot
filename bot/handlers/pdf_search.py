@@ -60,7 +60,7 @@ def create_pdf_keyboard(
 # --- 1. Trigger the search (from command or button) ---
 @router.message(Command(commands=["search"]))
 @router.message(F.text == "🔎 Search for pdf")
-async def start_search(message: Message, fsm_context: FSMContext, db_pool):
+async def start_search(message: Message, state: FSMContext, db_pool):
     user_id = message.from_user.id
     await user_queries.update_user_last_active(db_pool, user_id)
     
@@ -70,12 +70,12 @@ async def start_search(message: Message, fsm_context: FSMContext, db_pool):
         return
 
     # Set the state and ask for the query
-    await fsm_context.set_state(UserFlow.AwaitingSearchQuery)
+    await state.set_state(UserFlow.AwaitingSearchQuery)
     await message.answer("Please send me your search query (e.g., 'physics chapter 1').\nType /stop to cancel.")
 
 # --- 2. Handle the user's text query ---
 @router.message(UserFlow.AwaitingSearchQuery)
-async def handle_search_query(message: Message, fsm_context: FSMContext, db_pool):
+async def handle_search_query(message: Message, state: FSMContext, db_pool):
     query = message.text
     user_id = message.from_user.id
     
@@ -102,7 +102,7 @@ async def handle_search_query(message: Message, fsm_context: FSMContext, db_pool
         reply_markup=keyboard.as_markup()
     )
     # We are done with this specific query, so we clear the state.
-    await fsm_context.clear()
+    await state.clear()
 
 # --- 3. Handle Pagination Clicks ---
 @router.callback_query(F.data.startswith("pdf_page:"))

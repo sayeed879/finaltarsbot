@@ -136,7 +136,7 @@ async def call_my_ai_api(bot: Bot, user_id: int, system_prompt: str, history: li
 
 # --- 1. Trigger the AI Mode ---
 @router.message(F.text == "💬 Chat with Ai")
-async def start_ai_chat(message: Message, fsm_context: FSMContext, db_pool):
+async def start_ai_chat(message: Message, state: FSMContext, db_pool):
     user_id = message.from_user.id
     await user_queries.update_user_last_active(db_pool, user_id)
     
@@ -152,8 +152,8 @@ async def start_ai_chat(message: Message, fsm_context: FSMContext, db_pool):
         )
         return
 
-    await fsm_context.set_state(UserFlow.AwaitingAIPrompt)
-    await fsm_context.update_data(history=[])
+    await state.set_state(UserFlow.AwaitingAIPrompt)
+    await state.update_data(history=[])
     
     await message.answer(
         "You are now in **AI Chat Mode**. "
@@ -164,7 +164,7 @@ async def start_ai_chat(message: Message, fsm_context: FSMContext, db_pool):
 @router.message(UserFlow.AwaitingAIPrompt)
 async def handle_ai_prompt(
     message: Message, 
-    fsm_context: FSMContext, 
+    state: FSMContext, 
     db_pool,
     bot: Bot, 
     ai_cache: Redis
@@ -197,11 +197,11 @@ async def handle_ai_prompt(
         success = await user_queries.decrement_ai_limit(db_pool, user_id)
         if not success:
             await message.answer("You are out of AI queries. Use /upgrade.")
-            await fsm_context.clear()
+            await state.clear()
             return
             
     # 2. Get data for AI
-    fsm_data = await fsm_context.get_data()
+    fsm_data = await state.get_data()
     history = fsm_data.get("history", [])
     system_prompt = await ai_queries.get_ai_prompt(db_pool, user.selected_class)
 
@@ -221,7 +221,7 @@ async def handle_ai_prompt(
     if len(history) > MAX_HISTORY_MESSAGES:
         history = history[-MAX_HISTORY_MESSAGES:]
         
-    await fsm_context.update_data(history=history)
+    await state.update_data(history=history)
 
     # 7. Save to global cache
     try:

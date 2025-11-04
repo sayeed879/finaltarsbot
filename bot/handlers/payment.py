@@ -94,8 +94,8 @@ Your details for verification:
 
 # --- 3. Handle payment screenshot ---
 @router.message(UserFlow.AwaitingScreenshot, F.photo)
-async def handle_screenshot(message: Message, bot: Bot, fsm_context: FSMContext, db_pool):
-    """Handles user’s payment screenshot and forwards it to the admin."""
+async def handle_screenshot(message: Message, bot: Bot, state: FSMContext, db_pool):
+    """Handles user's payment screenshot and forwards it to the admin."""
     try:
         user_id = message.from_user.id
         username = message.from_user.username or "N/A"
@@ -120,7 +120,7 @@ async def handle_screenshot(message: Message, bot: Bot, fsm_context: FSMContext,
             "✅ Thank you! I have sent your screenshot to the admin for verification. "
             "This may take some time. I will notify you once you are approved."
         )
-        await fsm_context.clear()
+        await state.clear()
 
     except Exception as e:
         logging.exception(f"Error in handle_screenshot: {e}")
