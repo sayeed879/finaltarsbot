@@ -129,7 +129,7 @@ def create_app() -> web.Application:
     
     
     # 8. Mount aiogram to the web app
-    setup_application(app, dp, bot=bot)
+    setup_application(app, dp, bot=bot, secret_token=WEBHOOK_SECRET)
     
     logging.info("AIOHTTP application configured successfully.")
     return app

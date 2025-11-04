@@ -125,9 +125,6 @@ async def call_my_ai_api(bot: Bot, user_id: int, system_prompt: str, history: li
         
         # User-friendly error message
         return "❌ Sorry, I encountered an error. Please try again in a moment."
-
-    except Exception as e:
-        logging.error(f"Gemini API Call Failed for user {user_id}: {e}")
         try:
             await bot.send_message(
                 ADMIN_ID, 

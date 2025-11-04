@@ -22,4 +22,8 @@ all_handlers_router.include_router(payment.router)
 # Add a "fallback" handler for any text not caught
 @all_handlers_router.message()
 async def unknown_message(message: Message):
-    pass
+    # (You could also add a db_pool and update last_active)
+    await message.answer(
+        "I'm not sure what you mean. Please use the buttons "
+        "or type /help to see available commands."
+    )
