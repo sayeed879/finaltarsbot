@@ -18,7 +18,7 @@ router = Router()
 
 # --- Payment configuration ---
 UPGRADE_PRICE = "199"
-PAYMENT_QR_CODE_FILE_ID = "AgACAgUAAxkBAAEYwXZpCcc1sLHhq4w23t-7tX_ZZ2crBQACAw9rGwvQKFQFpXe3ZEZeWAEAAwIAA3kAAzYE"
+PAYMENT_QR_CODE_FILE_ID = "AgACAgUAAxkDAAINimkJzjyfC-qKRd9Ao9XvA_ZGpeQiAAL3C2sb6OtQVC1WyTarTeCCAQADAgADeQADNgQ"
 
 PAYMENT_MESSAGE_TEXT = f"""
 <b>💎 Get Premium Access! 💎</b>
