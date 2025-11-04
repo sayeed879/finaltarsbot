@@ -21,7 +21,7 @@ from . import pdf_search
 from . import ai_chat
 from . import payment
 from . import user_general
-
+from . import unknown_text
 # Create the main router that combines all other routers
 all_handlers_router = Router()
 
@@ -38,31 +38,20 @@ all_handlers_router.include_router(user_start.router)
 
 
 all_handlers_router.include_router(user_general.router)
+all_handlers_router.include_router(admin.router)
 all_handlers_router.include_router(payment.router)
 
 
 # --- 2. ADMIN COMMANDS (HIGH PRIORITY) ---
 # Admin commands must come before general handlers to avoid conflicts
 # Admin commands are filtered by AdminFilter, so they won't interfere with users
-all_handlers_router.include_router(admin.router)
+all_handlers_router.include_router(ai_chat.router)
 
-# --- 3. FSM STATE HANDLERS (MEDIUM-HIGH PRIORITY) ---
-# These handle specific user flows like PDF search, AI chat, payments
-# They use FSM states, so they won't interfere with each other
-
-# PDF Search: Handles /search command and PDF download flow
 all_handlers_router.include_router(pdf_search.router)
 
 # AI Chat: Handles AI conversation and message history
-all_handlers_router.include_router(ai_chat.router)
-# Payment: Handles /upgrade, payment QR codes, and screenshot verification
-# --- 4. GENERAL HANDLERS (LOWEST PRIORITY) ---
-# These are catch-all handlers for commands like /help, /stats, /stop
-# They must be LAST to avoid catching messages meant for FSM states
-# The general text handler is filtered with StateFilter(None) to only
-# catch messages when the user is NOT in any FSM state
 
-
+all_handlers_router.include_router(unknown_text.router)
 
 # ============================================================================
 # DEBUGGING: Log router registration
