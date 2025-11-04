@@ -12,24 +12,23 @@ from bot.fsm.states import UserFlow, AdminFlow
 # Initialize router
 router = Router()
 
-# --- Handler for the /stop command ---
+#
 @router.message(Command(commands=["stop"]))
-async def handle_stop(message: Message, fsm_context: FSMContext, db_pool):
+async def handle_stop(message: Message, state: FSMContext, db_pool):
     """Cancel any active operation and return to main menu"""
     user_id = message.from_user.id
-    
+
     # Update last active time
     await user_queries.update_user_last_active(db_pool, user_id)
-    
-    # Get the current state
-    current_state = await fsm_context.get_state()
-    
-    # Check if the user is in ANY state
+
+    # Get the current FSM state
+    current_state = await state.get_state()
+
     if current_state:
-        # Clear the state
-        await fsm_context.clear()
-        
-        # Provide feedback based on what they were doing
+        # Clear FSM
+        await state.clear()
+
+        # Detect which process was cancelled
         state_messages = {
             UserFlow.AwaitingClassSelection: "Class selection",
             UserFlow.AwaitingSearchQuery: "PDF search",
@@ -38,19 +37,20 @@ async def handle_stop(message: Message, fsm_context: FSMContext, db_pool):
             AdminFlow.AwaitingBroadcastMessage: "Broadcast message",
             AdminFlow.AddPDF_AwaitingTitle: "PDF upload"
         }
-        
+
         operation = "operation"
-        for state, msg in state_messages.items():
-            if current_state == state.state:
+        for st, msg in state_messages.items():
+            if current_state == st.state:
                 operation = msg
                 break
-        
+
         await message.answer(
             f"🛑 <b>{operation.title()} Cancelled</b>\n\n"
             "You are now back in the main menu.\n\n"
             "Use the buttons below or type /help for assistance.",
             reply_markup=get_main_menu_keyboard()
         )
+
     else:
         await message.answer(
             "ℹ️ <b>No Active Operation</b>\n\n"
@@ -58,7 +58,7 @@ async def handle_stop(message: Message, fsm_context: FSMContext, db_pool):
             "Here's the main menu:",
             reply_markup=get_main_menu_keyboard()
         )
-
+        
 # --- Handler for the /help command ---
 @router.message(Command(commands=["help"]))
 @router.message(F.text == "🆘 /help")

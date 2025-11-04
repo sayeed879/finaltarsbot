@@ -193,12 +193,12 @@ async def end_user_plan(pool: asyncpg.Pool, user_id: int) -> bool:
                 SET
                     is_premium = FALSE,
                     premium_expiry_date = NULL,
-                    ai_limit_remaining = 10,  -- Free AI limit
-                    pdf_downloads_remaining = 10, -- Free PDF limit
-                    pdf_downloads_reset_date = (CURRENT_TIMESTAMP + INTERVAL '30 days')  -- <-- ADD THIS LINE
-                WHERE user_id = $2
+                    ai_limit_remaining = 10,           -- Free AI limit
+                    pdf_downloads_remaining = 10,      -- Free PDF limit
+                    pdf_downloads_reset_date = (CURRENT_TIMESTAMP + INTERVAL '30 days')
+                WHERE user_id = $1::bigint
                 """,
-                user_id
+                int(user_id)
             )
             logging.info(f"Ended premium plan for user {user_id}.")
             return True

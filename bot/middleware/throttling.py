@@ -27,8 +27,8 @@ class ThrottlingMiddleware(BaseMiddleware):
             "start": 5.0,        # 5 seconds between /start commands
             "help": 5.0,         # 5 seconds between /help commands
             "pdf_search": 3.0,   # 3 seconds between searches
-            "ai_chat": 2.0,      # 2 seconds between AI messages
-            "upgrade": 10.0,     # 10 seconds between upgrade attempts
+            "ai_chat": 1.0,      # 1 second between AI messages
+            "upgrade": 5.0,     # 5 seconds between upgrade attempts
         }
     
     def _clean_old_timestamps(self, timestamps: list, window: int = 60) -> list:
