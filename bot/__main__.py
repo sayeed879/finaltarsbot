@@ -134,14 +134,22 @@ def create_app() -> web.Application:
     
     # 8. Mount aiogram to the web app
     # 8. Mount aiogram to the web app
-    setup_application(
-        app, 
-        dp, 
-        bot=bot, 
-        secret_token=WEBHOOK_SECRET,
-        webhook_path=WEBHOOK_PATH  # <-- THIS IS THE MISSING LINE
+# 8. Create the webhook handler
+    handler = SimpleRequestHandler(
+        dispatcher=dp,
+        bot=bot,
+        secret_token=WEBHOOK_SECRET
     )
-    
+
+    # 9. Register the route with aiohttp
+    # This is the line that FINALLY fixes the 404 error.
+    app.router.add_post(WEBHOOK_PATH, handler)
+
+    # 10. Mount aiogram to the web app's lifecycle
+    # (This is for startup/shutdown events, not the route)
+    setup_application(app, dp, bot=bot)
+
+
     logging.info("AIOHTTP application configured successfully.")
     return app
 
