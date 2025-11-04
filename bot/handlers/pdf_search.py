@@ -73,8 +73,8 @@ def create_pdf_keyboard(
     return builder
 
 # --- 1. Trigger the search (from command or button) ---
-@router.message(Command(commands=["search"]))
-@router.message(F.text == "🔎 Search for pdf")
+@router.message(Command("search"), StateFilter('*'))
+@router.message(F.text == "🔎 Search for pdf", StateFilter('*'))
 async def start_search(message: Message, state: FSMContext, db_pool):
     """Initiate PDF search flow"""
     user_id = message.from_user.id

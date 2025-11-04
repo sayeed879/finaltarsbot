@@ -13,7 +13,7 @@ from bot.fsm.states import UserFlow, AdminFlow
 router = Router()
 
 #
-@router.message(Command(commands=["stop"]))
+@router.message(Command("stop"), StateFilter('*'))  #
 async def handle_stop(message: Message, state: FSMContext, db_pool):
     """Cancel any active operation and return to main menu"""
     user_id = message.from_user.id
@@ -58,9 +58,9 @@ async def handle_stop(message: Message, state: FSMContext, db_pool):
             "Here's the main menu:",
             reply_markup=get_main_menu_keyboard()
         )
-        
+
 # --- Handler for the /help command ---
-@router.message(Command(commands=["help"]))
+@router.message(Command("help"), StateFilter('*'))
 @router.message(F.text == "🆘 /help")
 async def handle_help(message: Message, db_pool):
     """Show help message with all available commands"""
@@ -98,7 +98,7 @@ async def handle_help(message: Message, db_pool):
     await message.answer(help_text, reply_markup=get_main_menu_keyboard())
 
 # --- Handler for the user's /stats command ---
-@router.message(Command(commands=["stats"]))
+@router.message(Command("stats"), StateFilter('*'))
 async def handle_stats(message: Message, db_pool):
     """Show user's account statistics and limits"""
     user_id = message.from_user.id

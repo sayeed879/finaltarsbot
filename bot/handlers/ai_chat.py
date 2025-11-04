@@ -220,7 +220,7 @@ async def call_my_ai_api(
             )
 
 # --- 1. Trigger the AI Mode ---
-@router.message(F.text == "💬 Chat with Ai")
+@router.message(F.text == "💬 Chat with Ai", StateFilter('*'))
 async def start_ai_chat(message: Message, state: FSMContext, db_pool):
     """Start AI chat mode"""
     user_id = message.from_user.id
