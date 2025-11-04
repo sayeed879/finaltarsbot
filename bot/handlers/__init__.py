@@ -36,6 +36,11 @@ all_handlers_router = Router()
 # These are the entry points and should never be blocked
 all_handlers_router.include_router(user_start.router)
 
+
+all_handlers_router.include_router(user_general.router)
+all_handlers_router.include_router(payment.router)
+
+
 # --- 2. ADMIN COMMANDS (HIGH PRIORITY) ---
 # Admin commands must come before general handlers to avoid conflicts
 # Admin commands are filtered by AdminFilter, so they won't interfere with users
@@ -52,14 +57,13 @@ all_handlers_router.include_router(pdf_search.router)
 all_handlers_router.include_router(ai_chat.router)
 
 # Payment: Handles /upgrade, payment QR codes, and screenshot verification
-all_handlers_router.include_router(payment.router)
-
 # --- 4. GENERAL HANDLERS (LOWEST PRIORITY) ---
 # These are catch-all handlers for commands like /help, /stats, /stop
 # They must be LAST to avoid catching messages meant for FSM states
 # The general text handler is filtered with StateFilter(None) to only
 # catch messages when the user is NOT in any FSM state
-all_handlers_router.include_router(user_general.router)
+
+
 
 # ============================================================================
 # DEBUGGING: Log router registration
