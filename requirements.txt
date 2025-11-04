@@ -1,5 +1,5 @@
 # Core bot framework with pydantic support
-aiogram[pydantic]==3.3.0
+aiogram[pydantic]==3.4.1
 
 # AI and Machine Learning
 google-generativeai>=0.8.0
