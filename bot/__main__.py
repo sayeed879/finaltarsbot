@@ -113,6 +113,11 @@ def create_app() -> web.Application:
     fsm_storage = RedisStorage.from_url(REDIS_URL)
     dp = Dispatcher(storage=fsm_storage)
 
+    # --- THIS IS THE FIX for the 'fsm_context' error ---
+    # Make the bot instance available to all middleware and handlers
+    dp["bot"] = bot
+    # --- END OF FIX ---
+
     # 2. Register Middleware
     dp.update.outer_middleware(UserActivityMiddleware())
     
@@ -122,7 +127,7 @@ def create_app() -> web.Application:
     # 4. Create the aiohttp Web App with middleware
     app = web.Application(middlewares=[request_logging_middleware])
     
-    # 5. Store bot and dispatcher in the app
+    # 5. Store bot and dispatcher in the app (for on_startup/on_shutdown)
     app["bot"] = bot
     app["dp"] = dp
 
@@ -135,7 +140,7 @@ def create_app() -> web.Application:
     
     
     # 8. Mount aiogram to the web app
-    # --- THIS IS THE NEW FIX ---
+    # --- THIS IS THE FIX for the '404' error ---
     # We are explicitly registering the handler at the exact path
     SimpleRequestHandler(
         dispatcher=dp,
@@ -143,15 +148,6 @@ def create_app() -> web.Application:
         secret_token=WEBHOOK_SECRET,
     ).register(app, path=WEBHOOK_PATH)
     
-    # We are no longer using setup_application as it was causing 404s
-    # setup_application(
-    #     app, 
-    #     dp, 
-    #     bot=bot, 
-    #     secret_token=WEBHOOK_SECRET,
-    #     webhook_path="/webhook/" 
-    # )
-
     logging.info(f"AIOHTTP application configured. Listening for POST at {WEBHOOK_PATH}")
     return app
 
