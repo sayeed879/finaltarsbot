@@ -1,131 +1,292 @@
 import logging
 from aiogram import Router, F
 from aiogram.types import Message
-from aiogram.filters import Command
+from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 
 # Our component imports
 from bot.keyboards.reply import get_main_menu_keyboard
 from bot.db import user_queries
+from bot.fsm.states import UserFlow, AdminFlow
 
-# Assuming 'router' is defined here or imported
-router = Router() 
-# ... (rest of your imports) ...
+# Initialize router
+router = Router()
 
 # --- Handler for the /stop command ---
 @router.message(Command(commands=["stop"]))
 async def handle_stop(message: Message, fsm_context: FSMContext, db_pool):
+    """Cancel any active operation and return to main menu"""
     user_id = message.from_user.id
     
-    # Update last active time (Good practice)
+    # Update last active time
     await user_queries.update_user_last_active(db_pool, user_id)
     
-    # 1. Get the current state
+    # Get the current state
     current_state = await fsm_context.get_state()
     
-    # 2. Check if the user is in ANY state
+    # Check if the user is in ANY state
     if current_state:
-        # 3. Clear the state: This is the core action
+        # Clear the state
         await fsm_context.clear()
         
-        # 4. Acknowledge and present the main menu
+        # Provide feedback based on what they were doing
+        state_messages = {
+            UserFlow.AwaitingClassSelection: "Class selection",
+            UserFlow.AwaitingSearchQuery: "PDF search",
+            UserFlow.AwaitingAIPrompt: "AI chat",
+            UserFlow.AwaitingScreenshot: "Payment process",
+            AdminFlow.AwaitingBroadcastMessage: "Broadcast message",
+            AdminFlow.AddPDF_AwaitingTitle: "PDF upload"
+        }
+        
+        operation = "operation"
+        for state, msg in state_messages.items():
+            if current_state == state.state:
+                operation = msg
+                break
+        
         await message.answer(
-            "🛑 **Action Cancelled.** You are now back in the main menu.",
+            f"🛑 <b>{operation.title()} Cancelled</b>\n\n"
+            "You are now back in the main menu.\n\n"
+            "Use the buttons below or type /help for assistance.",
             reply_markup=get_main_menu_keyboard()
         )
     else:
-        # If not in a state, just send a confirmation (Good fallback)
         await message.answer(
-            "You weren't in any active operation. Here is the main menu.",
+            "ℹ️ <b>No Active Operation</b>\n\n"
+            "You weren't in any active process.\n\n"
+            "Here's the main menu:",
             reply_markup=get_main_menu_keyboard()
         )
 
-# ... (rest of the file content
 # --- Handler for the /help command ---
-# This also handles the "🆘 /help" button click
 @router.message(Command(commands=["help"]))
 @router.message(F.text == "🆘 /help")
 async def handle_help(message: Message, db_pool):
+    """Show help message with all available commands"""
     await user_queries.update_user_last_active(db_pool, message.from_user.id)
     
     help_text = (
-        "<b>Here are the commands you can use:</b>\n\n"
-        "<b>/start</b> - Start or restart the bot\n"
-        "<b>/stop</b> - Cancel any current operation\n"
-        "<b>/changeclass</b> - Change your selected class\n"
-        "<b>/stats</b> - Check your account status and limits\n"
-        "<b>/help</b> - Show this help message\n\n"
-        "You can also use the buttons on the main menu to access features."
+        "<b>📚 Bot Help & Commands</b>\n\n"
+        "<b>🎯 Main Commands:</b>\n"
+        "• <code>/start</code> - Start or restart the bot\n"
+        "• <code>/stop</code> - Cancel any current operation\n"
+        "• <code>/help</code> - Show this help message\n\n"
+        
+        "<b>⚙️ Account Management:</b>\n"
+        "• <code>/changeclass</code> - Change your selected class\n"
+        "• <code>/stats</code> - Check your account status and limits\n"
+        "• <code>/upgrade</code> - Upgrade to premium access\n\n"
+        
+        "<b>📖 Features:</b>\n"
+        "• <code>/search</code> or 🔎 Button - Search for PDFs in your class\n"
+        "• 💬 Button - Chat with AI assistant\n"
+        "• 💎 Button - Learn about premium features\n\n"
+        
+        "<b>💡 Tips:</b>\n"
+        "• Free users get 10 AI queries per day and 10 PDF downloads per month\n"
+        "• Premium users get 100 AI queries and 50 PDF downloads per day\n"
+        "• Use specific keywords when searching for PDFs\n"
+        "• Type /stop anytime to cancel an operation\n\n"
+        
+        "<b>🆘 Need More Help?</b>\n"
+        "Contact our support team or check the premium benefits with /upgrade.\n\n"
+        
+        "<i>Use the buttons below for quick access to features!</i>"
     )
+    
     await message.answer(help_text, reply_markup=get_main_menu_keyboard())
 
 # --- Handler for the user's /stats command ---
 @router.message(Command(commands=["stats"]))
 async def handle_stats(message: Message, db_pool):
+    """Show user's account statistics and limits"""
     user_id = message.from_user.id
     await user_queries.update_user_last_active(db_pool, user_id)
     
     user = await user_queries.get_user(db_pool, user_id)
     
     if not user:
-        await message.answer("Please type /start to register first.")
+        await message.answer(
+            "❌ <b>Not Registered</b>\n\n"
+            "Please type /start to register first."
+        )
         return
+
+    # Calculate days until expiry for premium users
+    days_remaining = ""
+    if user.is_premium and user.premium_expiry_date:
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        delta = user.premium_expiry_date - now
+        days = delta.days
+        hours = delta.seconds // 3600
+        
+        if days > 0:
+            days_remaining = f"\n<b>Time Remaining:</b> {days} days, {hours} hours"
+        elif days == 0:
+            days_remaining = f"\n<b>Time Remaining:</b> {hours} hours ⚠️"
+        else:
+            days_remaining = "\n<b>Status:</b> ⚠️ <i>Expired - will be downgraded soon</i>"
 
     # Format the stats message
     if user.is_premium:
-        status = "💎 Premium User"
-        expiry_date = user.premium_expiry_date.strftime("%Y-%m-%d at %H:%M")
-        plan_info = f"<b>Plan Expires:</b> {expiry_date}\n"
+        status_emoji = "💎"
+        status_text = "Premium User"
+        expiry_date = user.premium_expiry_date.strftime("%B %d, %Y at %H:%M UTC")
+        plan_info = (
+            f"<b>Plan Expires:</b> {expiry_date}"
+            f"{days_remaining}\n"
+        )
+        limits_header = "<b>📊 Premium Limits (Resets Daily at 00:00 UTC):</b>"
     else:
-        status = "👤 Free User"
-        plan_info = "<b>Plan:</b> Use /upgrade to get premium!\n"
+        status_emoji = "👤"
+        status_text = "Free User"
+        plan_info = (
+            "<b>Plan:</b> Free Tier\n"
+            "<b>Upgrade:</b> Use /upgrade to get premium!\n"
+        )
+        limits_header = "<b>📊 Free Tier Limits:</b>"
 
     stats_text = (
-        f"<b>Your Account Stats:</b>\n\n"
-        f"<b>Status:</b> {status}\n"
-        f"<b>Class:</b> {user.selected_class}\n"
+        f"<b>📊 Your Account Statistics</b>\n\n"
+        f"<b>Status:</b> {status_emoji} {status_text}\n"
+        f"<b>Class:</b> {user.selected_class.upper()}\n"
+        f"<b>Username:</b> @{message.from_user.username or 'Not set'}\n"
+        f"<b>User ID:</b> <code>{user_id}</code>\n\n"
         f"{plan_info}\n"
-        f"<b>Daily Limits (Resets at 00:00):</b>\n"
-        f"<b>AI Queries:</b> {user.ai_limit_remaining} remaining\n"
-        f"<b>PDF Downloads:</b> {user.pdf_downloads_remaining} remaining\n"
+        f"{limits_header}\n"
     )
     
+    # AI Limits
+    if user.is_premium:
+        ai_percentage = (user.ai_limit_remaining / 100) * 100
+        ai_bar = "🟩" * (ai_percentage // 10) + "⬜" * (10 - (ai_percentage // 10))
+        stats_text += (
+            f"<b>🤖 AI Queries:</b> {user.ai_limit_remaining}/100 remaining\n"
+            f"{ai_bar}\n\n"
+        )
+    else:
+        ai_percentage = (user.ai_limit_remaining / 10) * 100
+        ai_bar = "🟩" * (ai_percentage // 10) + "⬜" * (10 - (ai_percentage // 10))
+        stats_text += (
+            f"<b>🤖 AI Queries:</b> {user.ai_limit_remaining}/10 remaining (resets daily)\n"
+            f"{ai_bar}\n\n"
+        )
+    
+    # PDF Limits
+    if user.is_premium:
+        pdf_percentage = (user.pdf_downloads_remaining / 50) * 100
+        pdf_bar = "🟦" * (pdf_percentage // 10) + "⬜" * (10 - (pdf_percentage // 10))
+        stats_text += (
+            f"<b>📄 PDF Downloads:</b> {user.pdf_downloads_remaining}/50 remaining\n"
+            f"{pdf_bar}\n\n"
+        )
+    else:
+        pdf_percentage = (user.pdf_downloads_remaining / 10) * 100
+        pdf_bar = "🟦" * (pdf_percentage // 10) + "⬜" * (10 - (pdf_percentage // 10))
+        stats_text += (
+            f"<b>📄 PDF Downloads:</b> {user.pdf_downloads_remaining}/10 remaining (resets monthly)\n"
+            f"{pdf_bar}\n\n"
+        )
+    
+    # Additional info
+    if not user.is_premium:
+        stats_text += (
+            "<b>💡 Want More?</b>\n"
+            "Upgrade to premium for:\n"
+            "• 100 AI queries per day (10x more!)\n"
+            "• 50 PDF downloads per day (5x more!)\n"
+            "• All locked PDFs unlocked 🔓\n"
+            "• Priority support\n\n"
+            "Use /upgrade to learn more!"
+        )
+    else:
+        stats_text += (
+            "<i>Thank you for being a premium member! 🙏</i>\n\n"
+            "Your support helps us improve the bot."
+        )
+    
     await message.answer(stats_text)
-    # (Add this code to the end of bot/handlers/user_general.py)
 
-# A list of keywords that will trigger the "about" response
+# --- "About" trigger handler ---
 ABOUT_TRIGGERS = [
     "who are you", 
     "who made you", 
     "developer", 
     "about you", 
     "about the bot",
-    "sayeed"
+    "sayeed",
+    "who created",
+    "creator"
 ]
 
-@router.message(F.text)
-async def handle_general_text(message: Message, db_pool): # Renamed function
+# FIXED: Only catch text when NOT in any FSM state
+@router.message(StateFilter(None), F.text)
+async def handle_general_text(message: Message, db_pool):
     """
-    This handler catches all text messages that aren't
-    commands or specific buttons.
+    Handle general text messages only when user is not in any FSM state.
+    This prevents interference with ongoing operations.
     """
     if not message.text:
         return
 
-    msg_text = message.text.lower()
+    msg_text = message.text.lower().strip()
     await user_queries.update_user_last_active(db_pool, message.from_user.id)
     
     # Check if any trigger word is in the user's message
     if any(trigger in msg_text for trigger in ABOUT_TRIGGERS):
         response_text = (
-            "I was developed by **Sayeed**.\n\n"
-            "He is a 17-year-old full-stack developer!"
+            "<b>ℹ️ About This Bot</b>\n\n"
+            "<b>Developer:</b> Sayeed\n"
+            "<b>Age:</b> 17 years old\n"
+            "<b>Skills:</b> Full-stack developer\n\n"
+            "<b>Bot Features:</b>\n"
+            "• 🤖 AI-powered chat assistant\n"
+            "• 📚 PDF search and download system\n"
+            "• 💎 Premium subscription system\n"
+            "• 🔐 Secure payment verification\n"
+            "• 📊 Advanced analytics and stats\n\n"
+            "<b>Technology Stack:</b>\n"
+            "• Python 3.11 with Aiogram 3\n"
+            "• PostgreSQL database\n"
+            "• Redis caching\n"
+            "• Google Gemini AI integration\n"
+            "• AIOHTTP webhook server\n\n"
+            "Use /help to see all available commands!"
         )
         await message.answer(response_text)
     
-    else:
-        # If it's not an "about" message, it's unknown.
+    # Greetings
+    elif any(word in msg_text for word in ["hello", "hi", "hey", "namaste"]):
+        first_name = message.from_user.first_name or "there"
         await message.answer(
-            "I'm not sure what you mean. Please use the buttons "
-            "or type /help to see available commands."
+            f"👋 Hello {first_name}!\n\n"
+            "I'm your educational assistant bot. Here's what I can do:\n\n"
+            "• 🔎 Search and download PDFs\n"
+            "• 💬 Chat with AI\n"
+            "• 💎 Premium features\n\n"
+            "Use the buttons below or type /help for more information!",
+            reply_markup=get_main_menu_keyboard()
+        )
+    
+    # Thanks
+    elif any(word in msg_text for word in ["thanks", "thank you", "thx"]):
+        await message.answer(
+            "You're welcome! 😊\n\n"
+            "Happy to help. Let me know if you need anything else!\n\n"
+            "Use /help if you have questions."
+        )
+    
+    # Unknown message
+    else:
+        await message.answer(
+            "🤔 <b>Not Sure What You Mean</b>\n\n"
+            "I didn't understand that message. Here's what you can do:\n\n"
+            "• Use the <b>buttons below</b> for quick access\n"
+            "• Type <code>/help</code> to see all commands\n"
+            "• Type <code>/start</code> to restart the bot\n"
+            "• Click <b>💬 Chat with AI</b> to ask questions\n\n"
+            "<i>Tip: Use the menu buttons for easier navigation!</i>",
+            reply_markup=get_main_menu_keyboard()
         )
