@@ -7,7 +7,7 @@ from aiohttp import web
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.redis import RedisStorage
 # --- 1. THIS IMPORT IS CHANGED ---
-from aiogram.webhook.aiohttp_server import setup_application
+from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 
 # --- Import all Configs and Handlers ---
 from bot.config import (
@@ -19,6 +19,7 @@ from bot.handlers import all_handlers_router
 from bot.middleware.activity import UserActivityMiddleware
 
 # --- Webhook Configuration ---
+# This path MUST include the token for this fix
 WEBHOOK_PATH = f"/webhook/{BOT_TOKEN}"
 WEBHOOK_SECRET = "TarsBotWebhookSecret2025"  # Safe webhook secret
 WEBHOOK_URL = f"{BASE_WEBHOOK_URL.rstrip('/')}{WEBHOOK_PATH}"  # Ensure clean URL
@@ -45,6 +46,7 @@ async def on_startup(app: web.Application):
     
     # 4. Set the webhook with Telegram
     try:
+        # WEBHOOK_URL now correctly points to .../webhook/<token>
         await bot.set_webhook(
             url=WEBHOOK_URL,
             secret_token=WEBHOOK_SECRET
@@ -133,18 +135,26 @@ def create_app() -> web.Application:
     
     
     # 8. Mount aiogram to the web app
-    # THIS IS THE ONLY PART THAT MATTERS
-    # This one function correctly handles the route, FSM, and secret token.
-    setup_application(
-        app, 
-        dp, 
-        bot=bot, 
+    # --- THIS IS THE NEW FIX ---
+    # We are explicitly registering the handler at the exact path
+    SimpleRequestHandler(
+        dispatcher=dp,
+        bot=bot,
         secret_token=WEBHOOK_SECRET,
-        webhook_path="/webhook/"  # <-- THIS IS THE CORRECTED LINE
-    )
+    ).register(app, path=WEBHOOK_PATH)
+    
+    # We are no longer using setup_application as it was causing 404s
+    # setup_application(
+    #     app, 
+    #     dp, 
+    #     bot=bot, 
+    #     secret_token=WEBHOOK_SECRET,
+    #     webhook_path="/webhook/" 
+    # )
 
-    logging.info("AIOHTTP application configured successfully.")
+    logging.info(f"AIOHTTP application configured. Listening for POST at {WEBHOOK_PATH}")
     return app
 
 # --- This is the entry point Gunicorn will use ---
 app = create_app()
+
