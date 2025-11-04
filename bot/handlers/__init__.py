@@ -21,7 +21,6 @@ from . import pdf_search
 from . import ai_chat
 from . import payment
 from . import user_general
-from . import unknown
 
 # Create the main router that combines all other routers
 all_handlers_router = Router()
@@ -56,7 +55,6 @@ all_handlers_router.include_router(pdf_search.router)
 
 # AI Chat: Handles AI conversation and message history
 all_handlers_router.include_router(ai_chat.router)
-all_handlers_router.include_router(unknown.router)
 # Payment: Handles /upgrade, payment QR codes, and screenshot verification
 # --- 4. GENERAL HANDLERS (LOWEST PRIORITY) ---
 # These are catch-all handlers for commands like /help, /stats, /stop
