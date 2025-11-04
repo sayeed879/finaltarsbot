@@ -127,13 +127,6 @@ def create_app() -> web.Application:
     # 7. Add health check endpoint
     app.router.add_get("/health", health_check)
     
-    # 8. Setup webhook handler
-    handler = SimpleRequestHandler(
-        dispatcher=dp,
-        bot=bot,
-        secret_token=WEBHOOK_SECRET,
-    )
-    app.router.add_post(WEBHOOK_PATH, handler)
     
     # 8. Mount aiogram to the web app
     setup_application(app, dp, bot=bot)
