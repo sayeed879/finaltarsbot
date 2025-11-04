@@ -219,9 +219,9 @@ async def handle_screenshot(message: Message, bot: Bot, state: FSMContext, db_po
             f"• Plan Duration: 30 days\n"
             f"• Submitted: {message.date.strftime('%Y-%m-%d %H:%M UTC')}\n\n"
             "<b>⚡ Quick Actions:</b>\n"
-            f"• Approve: <code>/upgradeuser {user_id}</code>\n"
+            f"• Approve: /upgradeuser {user_id}\n"
             f"• Reject: Send message to {user_id}\n"
-            f"• Check Stats: <code>/stats</code>\n\n"
+            f"• Check Stats: /stats\n\n"
             "<b>📸 Payment Screenshot:</b>\n"
             "(See forwarded message below)"
         )

@@ -69,17 +69,17 @@ async def handle_help(message: Message, db_pool):
     help_text = (
         "<b>📚 Bot Help & Commands</b>\n\n"
         "<b>🎯 Main Commands:</b>\n"
-        "• <code>/start</code> - Start or restart the bot\n"
-        "• <code>/stop</code> - Cancel any current operation\n"
-        "• <code>/help</code> - Show this help message\n\n"
-        
+        "• /start - Start or restart the bot\n"
+        "• /stop - Cancel any current operation\n"
+        "• /help - Show this help message\n\n"
+
         "<b>⚙️ Account Management:</b>\n"
-        "• <code>/changeclass</code> - Change your selected class\n"
-        "• <code>/stats</code> - Check your account status and limits\n"
-        "• <code>/upgrade</code> - Upgrade to premium access\n\n"
-        
+        "• /changeclass - Change your selected class\n"
+        "• /stats - Check your account status and limits\n"
+        "• /upgrade - Upgrade to premium access\n\n"
+
         "<b>📖 Features:</b>\n"
-        "• <code>/search</code> or 🔎 Button - Search for PDFs in your class\n"
+        "• /search or 🔎 Button - Search for PDFs in your class\n"
         "• 💬 Button - Chat with AI assistant\n"
         "• 💎 Button - Learn about premium features\n\n"
         
@@ -284,8 +284,8 @@ async def handle_general_text(message: Message, db_pool):
             "🤔 <b>Not Sure What You Mean</b>\n\n"
             "I didn't understand that message. Here's what you can do:\n\n"
             "• Use the <b>buttons below</b> for quick access\n"
-            "• Type <code>/help</code> to see all commands\n"
-            "• Type <code>/start</code> to restart the bot\n"
+            "• Type /help to see all commands\n"
+            "• Type /start to restart the bot\n"
             "• Click <b>💬 Chat with AI</b> to ask questions\n\n"
             "<i>Tip: Use the menu buttons for easier navigation!</i>",
             reply_markup=get_main_menu_keyboard()
