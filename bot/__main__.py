@@ -129,7 +129,14 @@ def create_app() -> web.Application:
     
     
     # 8. Mount aiogram to the web app
-    setup_application(app, dp, bot=bot, secret_token=WEBHOOK_SECRET)
+    # 8. Mount aiogram to the web app
+    setup_application(
+        app, 
+        dp, 
+        bot=bot, 
+        secret_token=WEBHOOK_SECRET,
+        webhook_path=WEBHOOK_PATH  # <-- THIS IS THE MISSING LINE
+    )
     
     logging.info("AIOHTTP application configured successfully.")
     return app
