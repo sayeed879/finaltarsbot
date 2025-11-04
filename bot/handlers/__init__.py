@@ -8,7 +8,6 @@ from . import admin
 from . import pdf_search
 from . import ai_chat
 from . import payment
-from . import user_stop
 # This is the main router that combines all other routers
 all_handlers_router = Router()
 
