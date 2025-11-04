@@ -8,18 +8,25 @@ from . import admin
 from . import pdf_search
 from . import ai_chat
 from . import payment
-
 # This is the main router that combines all other routers
 all_handlers_router = Router()
 
-all_handlers_router.include_router(user_start.router)
+# --- ORDER IS CRITICAL ---
+# 1. Admin commands (highest priority)
 all_handlers_router.include_router(admin.router)
-all_handlers_router.include_router(user_general.router)
+
+# 2. User start and command handlers
+all_handlers_router.include_router(user_start.router)
+
+# 3. Specific text button handlers
 all_handlers_router.include_router(pdf_search.router)
 all_handlers_router.include_router(ai_chat.router)
 all_handlers_router.include_router(payment.router)
 
-# Add a "fallback" handler for any text not caught
+# 4. General text handlers (MUST BE AFTER BUTTONS)
+all_handlers_router.include_router(user_general.router)
+
+# 5. Final fallback for any message not caught
 @all_handlers_router.message()
 async def unknown_message(message: Message):
     # (You could also add a db_pool and update last_active)

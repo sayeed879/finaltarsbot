@@ -96,24 +96,31 @@ ABOUT_TRIGGERS = [
 ]
 
 @router.message(F.text)
-async def handle_about_trigger(message: Message, db_pool):
+async def handle_general_text(message: Message, db_pool): # Renamed function
     """
-    This handler catches specific keywords in any text message.
+    This handler catches all text messages that aren't
+    commands or specific buttons.
     """
     if not message.text:
         return
 
     msg_text = message.text.lower()
+    await user_queries.update_user_last_active(db_pool, message.from_user.id)
     
     # Check if any trigger word is in the user's message
     if any(trigger in msg_text for trigger in ABOUT_TRIGGERS):
-        await user_queries.update_user_last_active(db_pool, message.from_user.id)
-        
         response_text = (
             "I was developed by **Sayeed**.\n\n"
             "He is a 17-year-old full-stack developer!"
         )
         await message.answer(response_text)
+    
+    else:
+        # If it's not an "about" message, it's unknown.
+        await message.answer(
+            "I'm not sure what you mean. Please use the buttons "
+            "or type /help to see available commands."
+        )
     
     # If no trigger is matched, this handler does nothing,
     # and the message will be handled by the 'unknown_message'
