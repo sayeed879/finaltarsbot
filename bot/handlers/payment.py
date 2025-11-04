@@ -324,5 +324,3 @@ async def check_payment_status(message: Message, db_pool):
             "• All PDFs unlocked\n\n"
             "Use /upgrade to get premium access!"
         )
-
-        return False

@@ -396,5 +396,3 @@ async def handle_ai_prompt(
         f"Remaining: {user.ai_limit_remaining if not user.is_premium else 'unlimited'}"
     ) 
      
-     
-    return False

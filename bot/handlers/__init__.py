@@ -36,8 +36,6 @@ all_handlers_router = Router()
 # These are the entry points and should never be blocked
 all_handlers_router.include_router(user_start.router)
 
-
-all_handlers_router.include_router(user_general.router)
 all_handlers_router.include_router(admin.router)
 all_handlers_router.include_router(payment.router)
 
@@ -50,7 +48,7 @@ all_handlers_router.include_router(ai_chat.router)
 all_handlers_router.include_router(pdf_search.router)
 
 # AI Chat: Handles AI conversation and message history
-
+all_handlers_router.include_router(user_general.router)
 all_handlers_router.include_router(unknown_text.router)
 
 # ============================================================================
