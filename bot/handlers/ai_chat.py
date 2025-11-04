@@ -57,10 +57,10 @@ def initialize_ai_model():
             # Fallback to older model
             try:
                 MODEL = genai.GenerativeModel(
-                    'gemini-1.5-flash',
+                    'gemini-2.5-flash',
                     generation_config=generation_config
                 )
-                logging.info("✅ Fallback: Initialized Gemini 1.5 Flash model")
+                logging.info("✅ Fallback: Initialized Gemini 2.5 Flash model")
                 return True
             except Exception as e2:
                 logging.error(f"Fallback also failed: {e2}")
