@@ -10,6 +10,7 @@ class PdfResult:
     pdf_id: int
     title: str
     is_free: bool
+    rank: float = 0.0  # Add rank with default value
 
 async def search_pdfs(
     pool: asyncpg.Pool,
@@ -25,9 +26,8 @@ async def search_pdfs(
     """
     offset = (page - 1) * page_size
     
-    # websearch_to_tsquery is great for user-facing search.
-    # It understands queries like "physics" or "physics chapter 1"
-    search_query_vector = f"websearch_to_tsquery('simple', $2)"
+    # Use plainto_tsquery for more forgiving searches
+    search_query_vector = f"plainto_tsquery('simple', $2)"
 
     # --- This is the SQL query for ranking and sorting ---
     # 1. It calculates a 'rank' based on how well the keywords match.
@@ -40,11 +40,12 @@ async def search_pdfs(
             pdf_id, 
             title, 
             is_free,
-            ts_rank(to_tsvector('simple', search_keywords), {search_query_vector}) as rank
+            ts_rank(to_tsvector('simple', COALESCE(search_keywords, title)), {search_query_vector}) as rank
         FROM pdfs
         WHERE 
             class_tag = $1 AND 
-            to_tsvector('simple', search_keywords) @@ {search_query_vector}
+            (to_tsvector('simple', COALESCE(search_keywords, title)) @@ {search_query_vector}
+             OR title ILIKE $2 || '%')
         ORDER BY
             CASE WHEN $3::BOOLEAN THEN is_free END ASC, -- Premium user sort
             rank DESC
@@ -57,7 +58,8 @@ async def search_pdfs(
         FROM pdfs
         WHERE 
             class_tag = $1 AND 
-            to_tsvector('simple', search_keywords) @@ {search_query_vector};
+            (to_tsvector('simple', COALESCE(search_keywords, title)) @@ {search_query_vector}
+             OR title ILIKE $2 || '%');
     """
 
     async with pool.acquire() as conn:

@@ -107,12 +107,18 @@ async def setup_database_tables(pool: asyncpg.Pool):
             )
             # --- END OF NEW BLOCK ---
             
-            # --- Create an index for faster PDF searching ---
-            # This 'GIN' index is specialized for text searching
+            # --- Create indices for faster PDF searching ---
+            # GIN index for text search on both search_keywords and title
             await conn.execute("""
             CREATE INDEX IF NOT EXISTS idx_pdfs_keywords 
             ON pdfs 
-            USING GIN (to_tsvector('simple', search_keywords));
+            USING GIN (to_tsvector('simple', COALESCE(search_keywords, title)));
+            """)
+            
+            # B-tree index for LIKE queries on title
+            await conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_pdfs_title 
+            ON pdfs (title text_pattern_ops);
             """)
             
             logging.info("Database tables verified/created successfully.")
