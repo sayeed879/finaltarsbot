@@ -16,8 +16,7 @@ all_handlers_router = Router()
 all_handlers_router.include_router(user_start.router)
 all_handlers_router.include_router(admin.router)
 
-# 2. User start and command handlers
-all_handlers_router.include_router(user_start.router)
+# 2. hh
 
 # 3. Specific text button handlers
 all_handlers_router.include_router(pdf_search.router)
