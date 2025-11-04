@@ -96,16 +96,16 @@ def create_app() -> web.Application:
     """
     Creates and configures the main aiohttp web application.
     """
-    # !!! ADD THIS LINE !!!
-    logging.critical("!!!!!!!! EXECUTING LATEST CODE - v3 (The Final Fix) !!!!!!!!")
-    # !!!!!!!!!!!!!!!!!!!!!
+    # !!! I've updated this so we know the new code is running !!!
+    logging.critical("!!!!!!!! EXECUTING LATEST CODE - v4 (Final __main__.py) !!!!!!!!")
+    # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
     )
     logging.info("Configuring bot (new webhook mode)...")
-    
+
     # 1. Setup Bot, Storage, and Dispatcher
     bot = Bot(token=BOT_TOKEN, parse_mode="HTML")
     fsm_storage = RedisStorage.from_url(REDIS_URL)
