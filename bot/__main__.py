@@ -6,8 +6,11 @@ from aiohttp import web
 
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.redis import RedisStorage
-# --- 1. THIS IMPORT IS CHANGED ---
+from aiogram.fsm.strategy import FSMStrategy
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
+
+from bot.middleware.throttling import ThrottlingMiddleware
+from bot.middleware.db_session import DBSessionMiddleware
 
 # --- Import all Configs and Handlers ---
 from bot.config import (
@@ -110,16 +113,30 @@ def create_app() -> web.Application:
 
     # 1. Setup Bot, Storage, and Dispatcher
     bot = Bot(token=BOT_TOKEN, parse_mode="HTML")
-    fsm_storage = RedisStorage.from_url(REDIS_URL)
-    dp = Dispatcher(storage=fsm_storage)
+    
+    # Configure Redis storage with retry options
+    fsm_storage = RedisStorage.from_url(
+        REDIS_URL,
+        connection_kwargs={
+            'retry_on_timeout': True,
+            'retry_on_error': [aioredis.ConnectionError],
+            'health_check_interval': 30
+        }
+    )
+    
+    # Initialize dispatcher with FSM strategy
+    dp = Dispatcher(
+        storage=fsm_storage,
+        fsm_strategy=FSMStrategy.USER_IN_CHAT
+    )
 
-    # --- THIS IS THE FIX for the 'fsm_context' error ---
     # Make the bot instance available to all middleware and handlers
     dp["bot"] = bot
-    # --- END OF FIX ---
 
-    # 2. Register Middleware
+    # 2. Register all middleware in correct order
     dp.update.outer_middleware(UserActivityMiddleware())
+    dp.update.middleware(ThrottlingMiddleware())
+    dp.update.middleware(DBSessionMiddleware())
     
     # 3. Register All Handlers
     dp.include_router(all_handlers_router)

@@ -1,8 +1,12 @@
 import logging
+from datetime import datetime
 from aiogram import Router, F, Bot
 from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
+from sqlalchemy import update
+from sqlalchemy.ext.asyncio import AsyncSession
+from bot.db.models import User
 
 # --- Imports from your bot components ---
 from bot.config import ADMIN_ID
@@ -58,14 +62,18 @@ async def start_upgrade(message: Message, db_pool):
 
 # --- 2. Handle payment button (e.g., "Paytm") ---
 @router.callback_query(F.data.startswith("pay:"))
-async def send_payment_details(callback: CallbackQuery, fsm_context: FSMContext, db_pool):
+async def send_payment_details(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
     """Sends payment QR code and moves user to screenshot state."""
     try:
         user_id = callback.from_user.id
         username = callback.from_user.username or "N/A"
 
-        # Update last active status
-        await user_queries.update_user_last_active(db_pool, user_id)
+        # Update last active status using SQLAlchemy
+        stmt = update(User).where(User.user_id == user_id).values(
+            last_active=datetime.utcnow()
+        )
+        await session.execute(stmt)
+        await session.commit()
 
         # Send payment QR code
         await callback.message.answer_photo(
@@ -81,7 +89,7 @@ Your details for verification:
 """
         )
 
-        await fsm_context.set_state(UserFlow.AwaitingScreenshot)
+        await state.set_state(UserFlow.AwaitingScreenshot)
         await callback.answer("Please send your screenshot.")
         await callback.message.edit_text("QR code sent. Please check your chat.")
     
