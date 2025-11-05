@@ -37,18 +37,10 @@ PAYMENT_MESSAGE_TEXT = f"""
 • <b>100 AI queries per day</b> (10x more than free users)
 • Faster AI response times
 • Enhanced AI memory (remembers more context)
-• Access to advanced AI features
 
 <b>⚡ Other Benefits:</b>
-• <b>Priority support</b> - Get help faster
-• <b>No ads or promotional messages</b>
 • Early access to new features
 • Dedicated premium support channel
-
-<b>📊 Your Current Status:</b>
-• You are currently on the <b>Free Plan</b>
-• Free users get: 10 AI queries/day, 10 PDF downloads/month
-• Many PDFs are locked for free users 🔒
 
 <b>💳 Payment Methods:</b>
 Click a button below to get the payment QR code for your preferred method.

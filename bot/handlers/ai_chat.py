@@ -40,12 +40,25 @@ def initialize_ai_model():
         MODEL = genai.GenerativeModel(
             'gemini-2.5-flash',
             generation_config=generation_config,
-            safety_settings={
-                'HARASSMENT': 'BLOCK_NONE',
-                'HATE_SPEECH': 'BLOCK_NONE',
-                'SEXUALLY_EXPLICIT': 'BLOCK_NONE',
-                'DANGEROUS_CONTENT': 'BLOCK_NONE',
-            }
+          # --- THIS IS THE NEW, CORRECTED CODE ---
+            safety_settings=[
+                {
+                    "category": "HARM_CATEGORY_HARASSMENT",
+                    "threshold": "BLOCK_NONE"
+                },
+                {
+                    "category": "HARM_CATEGORY_HATE_SPEECH",
+                    "threshold": "BLOCK_NONE"
+                },
+                {
+                    "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                    "threshold": "BLOCK_NONE"
+                },
+                {
+                    "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                    "threshold": "BLOCK_NONE"
+                }
+            ]
         )
         logging.info("✅ Successfully initialized Gemini Flash model")
         return True
@@ -257,7 +270,8 @@ async def start_ai_chat(message: Message, state: FSMContext, db_pool):
     
     await message.answer(welcome_message)
 
-# --- 2. Handle the user's AI prompt (FIXED: Better state handling and Redis error handling) ---
+# In bot/handlers/ai_chat.py
+
 @router.message(UserFlow.AwaitingAIPrompt, ~Command("stop"))
 async def handle_ai_prompt(
     message: Message, 
@@ -297,9 +311,7 @@ async def handle_ai_prompt(
         return
 
     # --- Check Global Cache First (WITH PROPER ERROR HANDLING) ---
-    cache_key = f"ai_cache:{prompt.lower().strip()[:100]}"  # Limit key length
-    cached_response = None
-    
+    cache_key = f"ai_cache:{prompt.lower().strip()[:100]}"
     try:
         cached_response = await ai_cache.get(cache_key)
         if cached_response:
@@ -311,24 +323,18 @@ async def handle_ai_prompt(
             return
     except Exception as e:
         logging.warning(f"Redis cache GET error (non-fatal): {e}")
-        # Continue without cache - don't fail the request
 
     logging.info(f"❌ AI Cache MISS for user {user_id} - Calling AI API")
     
-    # --- Decrement Limit (if not premium) ---
-    if not user.is_premium:
-        success = await user_queries.decrement_ai_limit(db_pool, user_id)
-        if not success:
-            await message.answer(
-                "❌ <b>AI Limit Reached</b>\n\n"
-                "You have used all your AI queries for today.\n"
-                "Use /upgrade for unlimited access!"
-            )
-            await state.clear()
-            return
-        
-        # Get updated user
-        user = await user_queries.get_user(db_pool, user_id)
+    # --- Check Limit (but don't decrement yet) ---
+    if not user.is_premium and user.ai_limit_remaining <= 0:
+        await message.answer(
+            "❌ <b>AI Limit Reached</b>\n\n"
+            "You have used all your AI queries for today.\n"
+            "Use /upgrade for unlimited access!"
+        )
+        await state.clear()
+        return
             
     # --- Get data for AI ---
     fsm_data = await state.get_data()
@@ -341,13 +347,26 @@ async def handle_ai_prompt(
     # --- Call AI ---
     ai_response = await call_my_ai_api(bot, user_id, system_prompt, history, prompt)
 
+    # --- Check for AI errors BEFORE decrementing ---
+    if ai_response.startswith("❌") or ai_response.startswith("⚠️") or ai_response.startswith("⏱️"):
+        await message.answer(ai_response)
+        # We DON'T decrement the limit because it failed
+        return
+
+    # --- Decrement Limit (if not premium) ---
+    # We only do this AFTER we know the AI call was successful
+    remaining_queries = user.ai_limit_remaining
+    if not user.is_premium:
+        success = await user_queries.decrement_ai_limit(db_pool, user_id)
+        if success:
+            remaining_queries -= 1
+    
     # --- Send response to user ---
     response_message = ai_response
     
-    # Add remaining queries info for free users
     if not user.is_premium:
         response_message += (
-            f"\n\n<i>💬 Queries remaining today: {user.ai_limit_remaining}/10</i>"
+            f"\n\n<i>💬 Queries remaining today: {remaining_queries}/10</i>"
         )
     
     await message.answer(response_message)
@@ -356,22 +375,19 @@ async def handle_ai_prompt(
     history.append({"role": "user", "parts": [{"text": prompt}]})
     history.append({"role": "model", "parts": [{"text": ai_response}]})
     
-    # Trim history
-    if len(history) > MAX_HISTORY_MESSAGES * 2:  # *2 because we store both user and model
+    if len(history) > MAX_HISTORY_MESSAGES * 2:
         history = history[-MAX_HISTORY_MESSAGES * 2:]
         
     await state.update_data(history=history)
 
-    # --- Save to global cache (WITH PROPER ERROR HANDLING) ---
-    if not ai_response.startswith("❌") and not ai_response.startswith("⚠️"):
-        try:
-            await ai_cache.set(cache_key, ai_response, ex=CACHE_EXPIRY)
-            logging.info(f"✅ Cached AI response for query: {prompt[:50]}")
-        except Exception as e:
-            logging.warning(f"Redis cache SET error (non-fatal): {e}")
-            # Continue - caching failure shouldn't break the flow
+    # --- Save to global cache ---
+    try:
+        await ai_cache.set(cache_key, ai_response, ex=CACHE_EXPIRY)
+        logging.info(f"✅ Cached AI response for query: {prompt[:50]}")
+    except Exception as e:
+        logging.warning(f"Redis cache SET error (non-fatal): {e}")
     
     logging.info(
         f"User {user_id} AI query processed. "
-        f"Remaining: {user.ai_limit_remaining if not user.is_premium else 'unlimited'}"
+        f"Remaining: {remaining_queries if not user.is_premium else 'unlimited'}"
     )
