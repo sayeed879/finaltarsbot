@@ -25,7 +25,6 @@ from . import admin
 from . import payment
 from . import ai_chat
 from . import pdf_search
-from . import user_general
 from . import unknown_text
 
 # Create the main router that combines all other routers
@@ -72,8 +71,6 @@ logging.info("✅ Registered: PDF search handlers (Priority 6)")
 
 # --- 7. GENERAL USER HANDLERS ---
 # General commands and responses (lower priority)
-all_handlers_router.include_router(user_general.router)
-logging.info("✅ Registered: General user handlers (Priority 7)")
 
 # --- 8. UNKNOWN TEXT (LOWEST PRIORITY) ---
 # Catch-all for unrecognized text (must be last)
@@ -93,8 +90,7 @@ logging.info("  3. Admin (admin-only commands)")
 logging.info("  4. Payment (/upgrade, payment flow)")
 logging.info("  5. AI Chat (FSM state handlers)")
 logging.info("  6. PDF Search (FSM state handlers)")
-logging.info("  7. General User (help, about, greetings)")
-logging.info("  8. Unknown Text (catch-all)")
+logging.info("  7. Unknown Text (catch-all)")
 logging.info("=" * 80)
 
 # ============================================================================
