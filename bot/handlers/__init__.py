@@ -26,7 +26,7 @@ from . import payment
 from . import ai_chat
 from . import pdf_search
 from . import unknown_text
-
+from . import user_general
 # Create the main router that combines all other routers
 all_handlers_router = Router()
 
@@ -74,6 +74,7 @@ logging.info("✅ Registered: PDF search handlers (Priority 6)")
 
 # --- 8. UNKNOWN TEXT (LOWEST PRIORITY) ---
 # Catch-all for unrecognized text (must be last)
+all_handlers_router.include_router(user_general.router)
 all_handlers_router.include_router(unknown_text.router)
 logging.info("✅ Registered: Unknown text handler (Priority 8 - Last)")
 

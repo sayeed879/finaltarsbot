@@ -12,6 +12,7 @@ from bot.fsm.states import UserFlow
 from bot.db import user_queries, pdf_queries
 from bot.db.pdf_queries import PdfResult
 from typing import List
+from bot.fsm.states import UserFlow
 
 router = Router()
 PAGE_SIZE = 5  # Number of results per page
@@ -77,6 +78,7 @@ def create_pdf_keyboard(
 @router.message(F.text == "🔎 Search for pdf", StateFilter('*'))
 async def start_search(message: Message, state: FSMContext, db_pool):
     """Initiate PDF search flow"""
+    await state.clear()  # <-- ADD THIS LINE
     user_id = message.from_user.id
     await user_queries.update_user_last_active(db_pool, user_id)
     

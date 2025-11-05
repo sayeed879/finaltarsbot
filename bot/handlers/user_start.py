@@ -3,10 +3,9 @@ from typing import Any
 
 from aiogram import Router, F, Bot
 from aiogram.types import Message, CallbackQuery
-from aiogram.filters import CommandStart, Command
+from aiogram.filters import CommandStart, Command ,StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.exceptions import TelegramBadRequest
-
 # Our component imports
 from bot.config import CHANNEL_ID
 from bot.fsm.states import UserFlow
@@ -37,6 +36,8 @@ async def is_user_in_channel(bot: Bot, user_id: int) -> bool:
 
 # --- Shared business logic: start / onboarding flow ---
 async def start_user_flow(message: Message, bot: Bot, state: FSMContext, db_pool: Any):
+
+    await state.clear() # <-- ADD THIS L
     """
     Shared logic to register/check user and route them to class selection
     or main menu. This is a pure function (not a router handler) and can be
@@ -92,10 +93,9 @@ async def start_user_flow(message: Message, bot: Bot, state: FSMContext, db_pool
 
 
 # --- Handler for the /start command ---
-@router.message(CommandStart())
+@router.message(CommandStart(), StateFilter('*')) # <-- Add StateFilter('*')
 async def handle_start(message: Message, bot: Bot, state: FSMContext, db_pool: Any):
     await start_user_flow(message, bot, state, db_pool)
-
 
 # --- Handler for the "✅ Joined" button ---
 @router.callback_query(F.data == "check_join")
@@ -121,9 +121,10 @@ async def handle_check_join(callback: CallbackQuery, bot: Bot, state: FSMContext
 
 
 # --- Handler for the /changeclass command ---
-@router.message(Command(commands=["changeclass"]))
+# --- Handler for the /changeclass command ---
+@router.message(Command(commands=["changeclass"]), StateFilter('*')) # <-- Add StateFilter('*')
 async def handle_change_class(message: Message, state: FSMContext, db_pool: Any):
-    # Update last active
+    await state.clear() # <-- ADD THIS LINE
     try:
         await user_queries.update_user_last_active(db_pool, message.from_user.id)
     except Exception:

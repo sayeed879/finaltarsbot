@@ -55,12 +55,12 @@ Click a button below to get the payment QR code for your preferred method.
 
 <i>⚠️ After paying, please send a screenshot of your payment confirmation to activate your premium subscription.</i>
 """
-
 # --- 1. Start upgrade process ---
-@router.message(Command(commands=["upgrade"]), StateFilter(None))
-@router.message(F.text == "💎 Access premium content", StateFilter(None))
-async def start_upgrade(message: Message, db_pool):
-    """Handles the /upgrade command or premium access button - ONLY when not in another state"""
+@router.message(Command(commands=["upgrade"]), StateFilter('*')) # <-- CHANGED
+@router.message(F.text == "💎 Access premium content", StateFilter('*')) # <-- CHANGED
+async def start_upgrade(message: Message, db_pool, state: FSMContext): # <-- ADD 'state'
+    """Handles the /upgrade command or premium access button - works from ANY state"""
+    await state.clear() # <-- ADD THIS LINE
     user_id = message.from_user.id
     
     try:

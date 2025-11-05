@@ -15,8 +15,8 @@ from bot.db import user_queries, ai_queries
 from bot.config import GEMINI_API_KEY, ADMIN_ID
 
 router = Router()
-MAX_HISTORY_MESSAGES = 6
-MAX_INPUT_CHARS = 2000
+MAX_HISTORY_MESSAGES = 4
+MAX_INPUT_CHARS = 1000
 CACHE_EXPIRY = 7200
 
 # Initialize the model globally
@@ -38,7 +38,7 @@ def initialize_ai_model():
     try:
         genai.configure(api_key=GEMINI_API_KEY)
         MODEL = genai.GenerativeModel(
-            'gemini-1.5-flash',
+            'gemini-2.5-flash',
             generation_config=generation_config,
             safety_settings={
                 'HARASSMENT': 'BLOCK_NONE',
@@ -89,7 +89,7 @@ async def call_my_ai_api(
         system_instruction = (
             f"{system_prompt}\n\n"
             "Important: Keep responses concise but informative. "
-            "Aim for less than 150 words unless more detail is specifically requested."
+            "Aim for less than 100 words unless more detail is specifically requested."
         )
         
         conversation.append({
@@ -198,10 +198,12 @@ async def call_my_ai_api(
             )
 
 # --- 1. Trigger the AI Mode (FIXED: Added Command filter to prevent conflicts) ---
-@router.message(Command("ai"), StateFilter(None))
-@router.message(F.text == "💬 Chat with Ai", StateFilter(None))
+# --- 1. Trigger the AI Mode (FIXED: Runs from ANY state) ---
+@router.message(Command("ai"), StateFilter('*'))  # <-- CHANGED
+@router.message(F.text == "💬 Chat with Ai", StateFilter('*')) 
 async def start_ai_chat(message: Message, state: FSMContext, db_pool):
     """Start AI chat mode - ONLY when not in another state"""
+    await state.clear()  # <-- Clear any previous state
     user_id = message.from_user.id
     
     user = await user_queries.get_user(db_pool, user_id)

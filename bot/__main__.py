@@ -133,7 +133,6 @@ def create_app() -> web.Application:
     # 2. Register middleware
     dp.update.outer_middleware(UserActivityMiddleware())
     dp.update.middleware(ThrottlingMiddleware())
-    dp.update.middleware(DBSessionMiddleware())
     
     # 3. Register All Handlers
     dp.include_router(all_handlers_router)
