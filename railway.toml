@@ -8,5 +8,5 @@ startCommand = "gunicorn -c deploy/gunicorn_config.py bot.__main__:app"
 [cron]
 # This defines a new service to run your scheduler
 # It will run at 00:00 UTC every day.
-schedule = "3 0 * * *"
+schedule = "30 18 * * *"
 command = "python bot/utils/scheduler.py"
