@@ -30,17 +30,13 @@ PAYMENT_MESSAGE_TEXT = f"""
 <b>📚 PDF Access:</b>
 • Download up to <b>50 PDFs per day</b> (resets daily at 00:00 UTC)
 • <b>All locked PDFs unlocked</b> 🔓 - No restrictions!
-• Access to exclusive premium-only materials
-• Priority updates when new PDFs are added
 
 <b>🤖 AI Features:</b>
-• <b>100 AI queries per day</b> (10x more than free users)
-• Faster AI response times
-• Enhanced AI memory (remembers more context)
+. • Enjoy <b>100 AI queries per day</b> (10x more than free users)
+• Priority access to AI features 🚀
 
-<b>⚡ Other Benefits:</b>
-• Early access to new features
-• Dedicated premium support channel
+<b>🛠️ Custom Tools:</b>
+• Access exclusive tools and features
 
 <b>💳 Payment Methods:</b>
 Click a button below to get the payment QR code for your preferred method.
@@ -136,12 +132,6 @@ These details will help us verify your payment faster:
 <b>Your Username:</b> @{username}
 <b>Your Name:</b> {first_name}
 <b>Expected Amount:</b> ₹{UPGRADE_PRICE}
-
-<b>✅ What Happens Next:</b>
-1. You send the payment screenshot
-2. Our admin reviews it (usually within 1-24 hours)
-3. Your account is upgraded to Premium immediately after verification
-4. You receive a confirmation message with all premium features activated
 
 <b>💡 Pro Tips:</b>
 • Make sure the screenshot clearly shows:
