@@ -102,7 +102,7 @@ async def start_search(message: Message, state: FSMContext, db_pool):
             "❌ <b>PDF Download Limit Reached</b>\n\n"
             "You have used all your free PDF downloads for this month.\n\n"
             "💡 <b>Upgrade to Premium:</b>\n"
-            "• 50 PDF downloads per day\n"
+            "• More PDF downloads per month\n"
             "• Unlimited access to locked PDFs\n"
             "• 100 AI queries per day\n\n"
             "Use /upgrade to get premium access!"
@@ -335,7 +335,7 @@ async def send_pdf_link(callback: CallbackQuery, db_pool):
         if user.pdf_downloads_remaining <= 0:
             await callback.answer(
                 "❌ You are out of PDF downloads!\n\n"
-                "Use /upgrade to get 50 downloads per day.",
+                "Use /upgrade to get  more downloads.",
                 show_alert=True
             )
             return
@@ -365,7 +365,7 @@ async def send_pdf_link(callback: CallbackQuery, db_pool):
         if not updated_user.is_premium:
             download_msg += (
                 f"<b>Downloads Remaining:</b> {updated_user.pdf_downloads_remaining}/10\n\n"
-                "💡 Upgrade to premium for 50 daily downloads!"
+                "💡 Upgrade to premium for more downloads!"
             )
         else:
             download_msg += "✨ Enjoying premium? Thank you for your support!"

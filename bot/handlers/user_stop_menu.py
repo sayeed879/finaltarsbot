@@ -1,3 +1,12 @@
+"""
+STOP, MENU, HELP, and STATS Handlers
+
+CRITICAL: These handlers MUST be registered FIRST in __init__.py
+They need to work from ANY state, including FSM states.
+
+DO NOT add StateFilter to /stop - it must work everywhere!
+"""
+
 import logging
 from aiogram import Router, F
 from aiogram.types import Message
@@ -9,17 +18,28 @@ from bot.keyboards.reply import get_main_menu_keyboard
 from bot.db import user_queries
 from bot.fsm.states import UserFlow, AdminFlow
 
-# Initialize router
+# Initialize router with HIGH PRIORITY
 router = Router()
 
-#
-@router.message(Command("stop"), StateFilter('*'))  #
-async def handle_stop(message: Message, state: FSMContext, db_pool):
-    """Cancel any active operation and return to main menu"""
+# =============================================================================
+# /STOP HANDLER - HIGHEST PRIORITY - NO STATE FILTER
+# =============================================================================
+
+@router.message(Command("stop"))
+async def handle_stop_command(message: Message, state: FSMContext, db_pool):
+    """
+    Cancel ANY active operation and return to main menu.
+    This handler has NO state filter, so it works from ANY state.
+    
+    CRITICAL: This MUST be registered first in __init__.py
+    """
     user_id = message.from_user.id
 
     # Update last active time
-    await user_queries.update_user_last_active(db_pool, user_id)
+    try:
+        await user_queries.update_user_last_active(db_pool, user_id)
+    except Exception as e:
+        logging.warning(f"Could not update last_active: {e}")
 
     # Get the current FSM state
     current_state = await state.get_state()
@@ -35,7 +55,8 @@ async def handle_stop(message: Message, state: FSMContext, db_pool):
             UserFlow.AwaitingAIPrompt: "AI chat",
             UserFlow.AwaitingScreenshot: "Payment process",
             AdminFlow.AwaitingBroadcastMessage: "Broadcast message",
-            AdminFlow.AddPDF_AwaitingTitle: "PDF upload"
+            AdminFlow.AddPDF_AwaitingTitle: "PDF upload",
+            AdminFlow.DeletePDF_AwaitingConfirmation: "PDF deletion"
         }
 
         operation = "operation"
@@ -50,6 +71,8 @@ async def handle_stop(message: Message, state: FSMContext, db_pool):
             "Use the buttons below or type /help for assistance.",
             reply_markup=get_main_menu_keyboard()
         )
+        
+        logging.info(f"User {user_id} cancelled operation: {operation}")
 
     else:
         await message.answer(
@@ -59,18 +82,85 @@ async def handle_stop(message: Message, state: FSMContext, db_pool):
             reply_markup=get_main_menu_keyboard()
         )
 
-# --- Handler for the /help command ---
-@router.message(Command("help"), StateFilter('*'))
-@router.message(F.text == "🆘 /help")
-async def handle_help(message: Message, db_pool):
+# =============================================================================
+# /MENU HANDLER - Show main menu (only when not in FSM state)
+# =============================================================================
+
+@router.message(Command("menu"), StateFilter(None))
+@router.message(F.text == "🏠 Main Menu", StateFilter(None))
+async def handle_menu_command(message: Message, db_pool):
+    """
+    Show the main menu - ONLY when not in an active operation.
+    If user is in FSM state, they should use /stop first.
+    """
+    user_id = message.from_user.id
+    
+    try:
+        await user_queries.update_user_last_active(db_pool, user_id)
+    except Exception as e:
+        logging.warning(f"Could not update last_active: {e}")
+    
+    user = await user_queries.get_user(db_pool, user_id)
+    
+    if not user:
+        await message.answer(
+            "❌ <b>Not Registered</b>\n\n"
+            "Please type /start to register first."
+        )
+        return
+    
+    menu_text = (
+        "🏠 <b>Main Menu</b>\n\n"
+        f"<b>Your Class:</b> {user.selected_class.upper()}\n"
+        f"<b>Account Type:</b> {'💎 Premium' if user.is_premium else '👤 Free'}\n\n"
+        "<b>Quick Actions:</b>\n"
+        "• 🔎 Search for PDFs\n"
+        "• 💬 Chat with AI\n"
+        "• 💎 Upgrade to Premium\n"
+        "• 📊 Check your stats (/stats)\n"
+        "• 🆘 Get help (/help)\n\n"
+        "<i>Use the buttons below or type commands:</i>"
+    )
+    
+    await message.answer(menu_text, reply_markup=get_main_menu_keyboard())
+
+# Handle menu button press during FSM state
+@router.message(F.text == "🏠 Main Menu")
+async def handle_menu_during_fsm(message: Message, state: FSMContext):
+    """
+    If user presses menu button during FSM state, tell them to use /stop first.
+    """
+    current_state = await state.get_state()
+    
+    if current_state:
+        await message.answer(
+            "⚠️ <b>Active Operation Detected</b>\n\n"
+            "You're currently in the middle of an operation.\n"
+            "Please use /stop to cancel it first, then try again.\n\n"
+            "Or continue with your current operation."
+        )
+
+# =============================================================================
+# /HELP HANDLER - Only when not in FSM state
+# =============================================================================
+
+@router.message(Command("help"), StateFilter(None))
+@router.message(F.text == "🆘 /help", StateFilter(None))
+async def handle_help_command(message: Message, db_pool):
     """Show help message with all available commands"""
-    await user_queries.update_user_last_active(db_pool, message.from_user.id)
+    user_id = message.from_user.id
+    
+    try:
+        await user_queries.update_user_last_active(db_pool, user_id)
+    except Exception as e:
+        logging.warning(f"Could not update last_active: {e}")
     
     help_text = (
         "<b>📚 Bot Help & Commands</b>\n\n"
         "<b>🎯 Main Commands:</b>\n"
         "• /start - Start or restart the bot\n"
-        "• /stop - Cancel any current operation\n"
+        "• /stop - Cancel any current operation ⚡\n"
+        "• /menu - Show main menu 🏠\n"
         "• /help - Show this help message\n\n"
 
         "<b>⚙️ Account Management:</b>\n"
@@ -79,30 +169,56 @@ async def handle_help(message: Message, db_pool):
         "• /upgrade - Upgrade to premium access\n\n"
 
         "<b>📖 Features:</b>\n"
-        "• /search or 🔎 Button - Search for PDFs in your class\n"
-        "• 💬 Button - Chat with AI assistant\n"
+        "• /search or 🔎 Button - Search for PDFs\n"
+        "• /ai or 💬 Button - Chat with AI assistant\n"
         "• 💎 Button - Learn about premium features\n\n"
         
-        "<b>💡 Tips:</b>\n"
-        "• Free users get 10 AI queries per day and 10 PDF downloads per month\n"
-        "• Premium users get 100 AI queries and 50 PDF downloads per day\n"
-        "• Use specific keywords when searching for PDFs\n"
-        "• Type /stop anytime to cancel an operation\n\n"
+        "<b>💡 Important Tips:</b>\n"
+        "• <b>Use /stop anytime</b> to cancel an operation\n"
+        "• Free users: 10 AI queries/day, 10 PDF downloads/month\n"
+        "• Premium users: 100 AI queries/day, 50 PDF downloads/day\n"
+        "• Use specific keywords when searching PDFs\n"
+        "• Commands like /help won't work during active operations\n\n"
         
         "<b>🆘 Need More Help?</b>\n"
-        "Contact our support team or check the premium benefits with /upgrade.\n\n"
+        "Contact our support team or check premium benefits with /upgrade.\n\n"
         
-        "<i>Use the buttons below for quick access to features!</i>"
+        "<i>Use the buttons below for quick access!</i>"
     )
     
     await message.answer(help_text, reply_markup=get_main_menu_keyboard())
 
-# --- Handler for the user's /stats command ---
-@router.message(Command("stats"), StateFilter('*'))
-async def handle_stats(message: Message, db_pool):
+# Handle help button/command during FSM state
+@router.message(Command("help"))
+@router.message(F.text == "🆘 /help")
+async def handle_help_during_fsm(message: Message, state: FSMContext):
+    """
+    If user tries to access help during FSM state, give them quick guidance.
+    """
+    current_state = await state.get_state()
+    
+    if current_state:
+        await message.answer(
+            "ℹ️ <b>Quick Help</b>\n\n"
+            "You're currently in an active operation.\n\n"
+            "<b>To cancel and go back:</b> Type /stop\n"
+            "<b>To continue:</b> Follow the instructions above\n\n"
+            "For full help, use /stop first, then type /help again."
+        )
+
+# =============================================================================
+# /STATS HANDLER - Only when not in FSM state
+# =============================================================================
+
+@router.message(Command("stats"), StateFilter(None))
+async def handle_stats_command(message: Message, db_pool):
     """Show user's account statistics and limits"""
     user_id = message.from_user.id
-    await user_queries.update_user_last_active(db_pool, user_id)
+    
+    try:
+        await user_queries.update_user_last_active(db_pool, user_id)
+    except Exception as e:
+        logging.warning(f"Could not update last_active: {e}")
     
     user = await user_queries.get_user(db_pool, user_id)
     
@@ -113,7 +229,7 @@ async def handle_stats(message: Message, db_pool):
         )
         return
 
-    # Calculate days until expiry for premium users
+    # Calculate days remaining for premium users
     days_remaining = ""
     if user.is_premium and user.premium_expiry_date:
         from datetime import datetime, timezone
@@ -129,7 +245,7 @@ async def handle_stats(message: Message, db_pool):
         else:
             days_remaining = "\n<b>Status:</b> ⚠️ <i>Expired - will be downgraded soon</i>"
 
-    # Format the stats message
+    # Format stats message
     if user.is_premium:
         status_emoji = "💎"
         status_text = "Premium User"
@@ -158,7 +274,7 @@ async def handle_stats(message: Message, db_pool):
         f"{limits_header}\n"
     )
     
-    # AI Limits
+    # AI Limits with progress bar
     if user.is_premium:
         ai_percentage = (user.ai_limit_remaining / 100) * 100
         ai_bar = "🟩" * (ai_percentage // 10) + "⬜" * (10 - (ai_percentage // 10))
@@ -174,7 +290,7 @@ async def handle_stats(message: Message, db_pool):
             f"{ai_bar}\n\n"
         )
     
-    # PDF Limits
+    # PDF Limits with progress bar
     if user.is_premium:
         pdf_percentage = (user.pdf_downloads_remaining / 50) * 100
         pdf_bar = "🟦" * (pdf_percentage // 10) + "⬜" * (10 - (pdf_percentage // 10))
@@ -208,6 +324,21 @@ async def handle_stats(message: Message, db_pool):
         )
     
     await message.answer(stats_text)
+
+# Handle stats during FSM state
+@router.message(Command("stats"))
+async def handle_stats_during_fsm(message: Message, state: FSMContext):
+    """
+    If user tries to check stats during FSM state, tell them to use /stop first.
+    """
+    current_state = await state.get_state()
+    
+    if current_state:
+        await message.answer(
+            "ℹ️ <b>Stats Unavailable</b>\n\n"
+            "Please use /stop to cancel your current operation first.\n"
+            "Then you can check your stats with /stats."
+        )
 
 # --- "About" trigger handler ---
 ABOUT_TRIGGERS = [
@@ -277,5 +408,3 @@ async def handle_general_text(message: Message, db_pool):
             "Happy to help. Let me know if you need anything else!\n\n"
             "Use /help if you have questions."
         )
-
-        return False

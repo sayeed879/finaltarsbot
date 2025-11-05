@@ -1,26 +1,23 @@
 import logging
 from aiogram import Router, F, Bot
 from aiogram.types import Message, CallbackQuery
-from aiogram.filters import Command
+from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 
 # Import your queries
 from bot.db import user_queries
-
-# --- Imports from your bot components ---
 from bot.config import ADMIN_ID
 from bot.fsm.states import UserFlow
 from bot.keyboards.inline import get_payment_options_keyboard
-from bot.db import user_queries
+from bot.keyboards.reply import get_main_menu_keyboard
 
-# --- Initialize router ---
+# Initialize router
 router = Router()
 
-# --- Payment configuration ---
+# Payment configuration
 UPGRADE_PRICE = "199"
 PAYMENT_QR_CODE_FILE_ID = "AgACAgUAAxkDAAINimkJzjyfC-qKRd9Ao9XvA_ZGpeQiAAL3C2sb6OtQVC1WyTarTeCCAQADAgADeQADNgQ"
 
-# ENHANCED: More detailed payment message
 PAYMENT_MESSAGE_TEXT = f"""
 <b>💎 Upgrade to Premium Access! 💎</b>
 
@@ -60,70 +57,72 @@ Click a button below to get the payment QR code for your preferred method.
 """
 
 # --- 1. Start upgrade process ---
-@router.message(Command(commands=["upgrade"]))
-@router.message(F.text == "💎 Access premium content")
+@router.message(Command(commands=["upgrade"]), StateFilter(None))
+@router.message(F.text == "💎 Access premium content", StateFilter(None))
 async def start_upgrade(message: Message, db_pool):
-    """Handles the /upgrade command or premium access button."""
+    """Handles the /upgrade command or premium access button - ONLY when not in another state"""
+    user_id = message.from_user.id
+    
     try:
-        await user_queries.update_user_last_active(db_pool, message.from_user.id)
-
-        user = await user_queries.get_user(db_pool, message.from_user.id)
-        if not user:
-            await message.answer(
-                "❌ Please type /start to register first.",
-                reply_markup=None
-            )
-            return
-        
-        # Check if already premium
-        if user.is_premium:
-            expiry_date = user.premium_expiry_date.strftime("%B %d, %Y at %H:%M UTC")
-            
-            premium_status_msg = (
-                "✨ <b>You are already a Premium User!</b> ✨\n\n"
-                f"<b>Plan Status:</b> Active 💎\n"
-                f"<b>Expires On:</b> {expiry_date}\n\n"
-                "<b>Your Current Benefits:</b>\n"
-                "✅ 100 AI queries per day\n"
-                "✅ 50 PDF downloads per day\n"
-                "✅ All locked PDFs unlocked\n"
-                "✅ Priority support\n\n"
-                "Use /stats to check your usage.\n\n"
-                "<i>Your subscription will expire in a few days. We'll send you a reminder!</i>"
-            )
-            await message.answer(premium_status_msg)
-            return
-
-        # Show upgrade options
-        await message.answer(
-            PAYMENT_MESSAGE_TEXT,
-            reply_markup=get_payment_options_keyboard(),
-            disable_web_page_preview=True
-        )
-
+        await user_queries.update_user_last_active(db_pool, user_id)
     except Exception as e:
-        logging.exception(f"Error in start_upgrade: {e}")
-        await message.answer(
-            "❌ <b>Error</b>\n\n"
-            "An error occurred while processing your request. Please try again later or contact support."
-        )
+        logging.warning(f"Could not update last_active: {e}")
 
-# --- 2. Handle payment button (e.g., "Paytm") ---
+    user = await user_queries.get_user(db_pool, user_id)
+    if not user:
+        await message.answer(
+            "❌ Please type /start to register first.",
+            reply_markup=None
+        )
+        return
+    
+    # Check if already premium
+    if user.is_premium:
+        expiry_date = user.premium_expiry_date.strftime("%B %d, %Y at %H:%M UTC")
+        
+        premium_status_msg = (
+            "✨ <b>You are already a Premium User!</b> ✨\n\n"
+            f"<b>Plan Status:</b> Active 💎\n"
+            f"<b>Expires On:</b> {expiry_date}\n\n"
+            "<b>Your Current Benefits:</b>\n"
+            "✅ 100 AI queries per day\n"
+            "✅ 50 PDF downloads per day\n"
+            "✅ All locked PDFs unlocked\n"
+            "✅ Priority support\n\n"
+            "Use /stats to check your usage.\n\n"
+            "<i>Your subscription will expire in a few days. We'll send you a reminder!</i>"
+        )
+        await message.answer(premium_status_msg, reply_markup=get_main_menu_keyboard())
+        return
+
+    # Show upgrade options
+    await message.answer(
+        PAYMENT_MESSAGE_TEXT,
+        reply_markup=get_payment_options_keyboard(),
+        disable_web_page_preview=True
+    )
+    
+    logging.info(f"User {user_id} requested upgrade information")
+
+# --- 2. Handle payment button (FIXED: Proper QR code sending) ---
 @router.callback_query(F.data.startswith("pay:"))
-async def send_payment_details(callback: CallbackQuery, state: FSMContext, db_pool):
-    """Sends payment QR code and moves user to screenshot state."""
+async def send_payment_details(callback: CallbackQuery, state: FSMContext, db_pool, bot: Bot):
+    """Sends payment QR code and moves user to screenshot state - FIXED VERSION"""
     try:
         user_id = callback.from_user.id
         username = callback.from_user.username or "N/A"
         first_name = callback.from_user.first_name or "User"
 
         # Update last active status
-        await user_queries.update_user_last_active(db_pool, user_id)
+        try:
+            await user_queries.update_user_last_active(db_pool, user_id)
+        except Exception as e:
+            logging.warning(f"Could not update last_active: {e}")
         
         # Extract payment method from callback data
         payment_method = callback.data.split(":")[1].upper()
 
-        # ENHANCED: Detailed payment instructions
+        # Detailed payment instructions
         payment_caption = f"""
 <b>💳 Payment Instructions</b>
 
@@ -167,11 +166,24 @@ If you face any issues, type /help or contact our support.
 <i>⏳ Waiting for your payment screenshot...</i>
 """
 
-        # Send payment QR code
-        await callback.message.answer_photo(
-            photo=PAYMENT_QR_CODE_FILE_ID,
-            caption=payment_caption
-        )
+        # FIXED: Send payment QR code directly to user (not as reply to callback)
+        try:
+            await bot.send_photo(
+                chat_id=user_id,
+                photo=PAYMENT_QR_CODE_FILE_ID,
+                caption=payment_caption,
+                parse_mode="HTML"
+            )
+            logging.info(f"✅ Successfully sent QR code to user {user_id}")
+        except Exception as e:
+            logging.error(f"❌ Failed to send QR code to user {user_id}: {e}")
+            await callback.message.answer(
+                "❌ <b>Error Sending QR Code</b>\n\n"
+                "There was an error sending the payment QR code. "
+                "Please try /upgrade again or contact support."
+            )
+            await callback.answer("Error sending QR code", show_alert=True)
+            return
 
         # Set state to await screenshot
         await state.set_state(UserFlow.AwaitingScreenshot)
@@ -192,22 +204,25 @@ If you face any issues, type /help or contact our support.
         logging.exception(f"Error in send_payment_details: {e}")
         await callback.message.answer(
             "❌ <b>Error</b>\n\n"
-            "Sorry, there was an error sending payment details. Please try /upgrade again."
+            "Sorry, there was an error processing your request. Please try /upgrade again."
         )
         await callback.answer("Error occurred", show_alert=True)
 
 # --- 3. Handle payment screenshot ---
 @router.message(UserFlow.AwaitingScreenshot, F.photo)
 async def handle_screenshot(message: Message, bot: Bot, state: FSMContext, db_pool):
-    """Handles user's payment screenshot and forwards it to the admin."""
+    """Handles user's payment screenshot and forwards it to the admin"""
     try:
         user_id = message.from_user.id
         username = message.from_user.username or "N/A"
         first_name = message.from_user.first_name or "User"
         
-        await user_queries.update_user_last_active(db_pool, user_id)
+        try:
+            await user_queries.update_user_last_active(db_pool, user_id)
+        except Exception as e:
+            logging.warning(f"Could not update last_active: {e}")
 
-        # ENHANCED: Detailed admin notification
+        # Detailed admin notification
         admin_notification = (
             "<b>🔔 NEW PAYMENT VERIFICATION REQUEST</b>\n\n"
             "<b>👤 User Information:</b>\n"
@@ -229,7 +244,8 @@ async def handle_screenshot(message: Message, bot: Bot, state: FSMContext, db_po
         # Send notification to admin
         await bot.send_message(
             ADMIN_ID,
-            admin_notification
+            admin_notification,
+            parse_mode="HTML"
         )
         
         # Forward the screenshot
@@ -239,7 +255,7 @@ async def handle_screenshot(message: Message, bot: Bot, state: FSMContext, db_po
             message_id=message.message_id
         )
 
-        # ENHANCED: Detailed user confirmation
+        # Detailed user confirmation
         user_confirmation = (
             "✅ <b>Screenshot Received Successfully!</b>\n\n"
             "<b>What Happens Next:</b>\n\n"
@@ -266,7 +282,7 @@ async def handle_screenshot(message: Message, bot: Bot, state: FSMContext, db_po
             "<i>Thank you for upgrading! We appreciate your support. 🙏</i>"
         )
         
-        await message.answer(user_confirmation)
+        await message.answer(user_confirmation, parse_mode="HTML")
         
         # Clear FSM state
         await state.clear()
@@ -278,30 +294,34 @@ async def handle_screenshot(message: Message, bot: Bot, state: FSMContext, db_po
         await message.answer(
             "❌ <b>Error</b>\n\n"
             "Sorry, there was an error processing your screenshot. "
-            "Please try sending it again or contact support with /help."
+            "Please try sending it again or contact support with /help.",
+            parse_mode="HTML"
         )
 
 # --- 4. Handle invalid input (non-photo) ---
-@router.message(UserFlow.AwaitingScreenshot)
+@router.message(UserFlow.AwaitingScreenshot, ~F.photo)
 async def invalid_screenshot(message: Message):
-    """Informs user if they send a non-photo during payment verification."""
+    """Informs user if they send a non-photo during payment verification"""
     await message.answer(
-        "❌ <b>Invalid Format</b>\n\n"
-        "Please send a <b>photo/screenshot</b> of your payment confirmation.\n\n"
-        "<b>What to include in the screenshot:</b>\n"
-        "• Payment amount (₹{UPGRADE_PRICE})\n"
-        "• Transaction status (Success/Completed)\n"
-        "• Date and time\n"
-        "• Transaction ID (if available)\n\n"
-        "💡 <i>Tip: Use your phone's screenshot feature to capture the payment confirmation screen.</i>\n\n"
-        "Type /stop to cancel the payment process."
+        f"❌ <b>Invalid Format</b>\n\n"
+        f"Please send a <b>photo/screenshot</b> of your payment confirmation.\n\n"
+        f"<b>What to include in the screenshot:</b>\n"
+        f"• Payment amount (₹{UPGRADE_PRICE})\n"
+        f"• Transaction status (Success/Completed)\n"
+        f"• Date and time\n"
+        f"• Transaction ID (if available)\n\n"
+        f"💡 <i>Tip: Use your phone's screenshot feature to capture the payment confirmation screen.</i>\n\n"
+        f"Type /stop to cancel the payment process.",
+        parse_mode="HTML"
     )
 
-# --- 5. Additional: Check payment status ---
-@router.message(Command(commands=["paymentstatus"]))
+# --- 5. Check payment status ---
+@router.message(Command(commands=["paymentstatus"]), StateFilter(None))
 async def check_payment_status(message: Message, db_pool):
     """Allow users to check their payment/premium status"""
-    user = await user_queries.get_user(db_pool, message.from_user.id)
+    user_id = message.from_user.id
+    
+    user = await user_queries.get_user(db_pool, user_id)
     
     if not user:
         await message.answer("❌ Please type /start first.")
@@ -312,7 +332,8 @@ async def check_payment_status(message: Message, db_pool):
         await message.answer(
             "✨ <b>Premium Status: Active</b> ✨\n\n"
             f"<b>Expires On:</b> {expiry_date}\n\n"
-            "Use /stats to see your usage details."
+            "Use /stats to see your usage details.",
+            parse_mode="HTML"
         )
     else:
         await message.answer(
@@ -322,5 +343,6 @@ async def check_payment_status(message: Message, db_pool):
             "• 100 AI queries per day\n"
             "• 50 PDF downloads per day\n"
             "• All PDFs unlocked\n\n"
-            "Use /upgrade to get premium access!"
+            "Use /upgrade to get premium access!",
+            parse_mode="HTML"
         )

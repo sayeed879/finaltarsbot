@@ -2,13 +2,12 @@ import logging
 import asyncio
 from aiogram import Router, F, Bot
 from aiogram.types import Message
-from aiogram.filters import StateFilter
+from aiogram.filters import StateFilter, Command
 from aiogram.fsm.context import FSMContext
 from redis.asyncio import Redis
 
 import google.generativeai as genai
 from google.generativeai.types import GenerationConfig
-from google.api_core import retry
 
 # Our component imports
 from bot.fsm.states import UserFlow
@@ -16,9 +15,9 @@ from bot.db import user_queries, ai_queries
 from bot.config import GEMINI_API_KEY, ADMIN_ID
 
 router = Router()
-MAX_HISTORY_MESSAGES = 4  # Increased from 4 to 6 for better context
-MAX_INPUT_CHARS = 1000  # Increased from 1000 to 2000
-CACHE_EXPIRY = 7200  # 2 hours cache expiry
+MAX_HISTORY_MESSAGES = 6
+MAX_INPUT_CHARS = 2000
+CACHE_EXPIRY = 7200
 
 # Initialize the model globally
 MODEL = None
@@ -26,7 +25,7 @@ generation_config = GenerationConfig(
     temperature=0.7,
     top_p=0.95,
     top_k=40,
-    max_output_tokens=250,  # Increased from 250 for more detailed responses
+    max_output_tokens=500,
 )
 
 def initialize_ai_model():
@@ -38,33 +37,18 @@ def initialize_ai_model():
 
     try:
         genai.configure(api_key=GEMINI_API_KEY)
-        # Try to initialize Flash model
-        try:
-            MODEL = genai.GenerativeModel(
-                'gemini-2.5-flash-exp',  # Updated to latest model
-                generation_config=generation_config,
-                safety_settings={
-                    'HARASSMENT': 'BLOCK_NONE',
-                    'HATE_SPEECH': 'BLOCK_NONE',
-                    'SEXUALLY_EXPLICIT': 'BLOCK_NONE',
-                    'DANGEROUS_CONTENT': 'BLOCK_NONE',
-                }
-            )
-            logging.info("✅ Successfully initialized Gemini Flash model")
-            return True
-        except Exception as e:
-            logging.error(f"Failed to initialize Gemini model: {e}")
-            # Fallback to older model
-            try:
-                MODEL = genai.GenerativeModel(
-                    'gemini-2.5-flash',
-                    generation_config=generation_config
-                )
-                logging.info("✅ Fallback: Initialized Gemini 2.5 Flash model")
-                return True
-            except Exception as e2:
-                logging.error(f"Fallback also failed: {e2}")
-                return False
+        MODEL = genai.GenerativeModel(
+            'gemini-1.5-flash',
+            generation_config=generation_config,
+            safety_settings={
+                'HARASSMENT': 'BLOCK_NONE',
+                'HATE_SPEECH': 'BLOCK_NONE',
+                'SEXUALLY_EXPLICIT': 'BLOCK_NONE',
+                'DANGEROUS_CONTENT': 'BLOCK_NONE',
+            }
+        )
+        logging.info("✅ Successfully initialized Gemini Flash model")
+        return True
     except Exception as e:
         logging.error(f"Failed to configure Gemini API: {e}")
         return False
@@ -80,13 +64,10 @@ async def call_my_ai_api(
     new_prompt: str
 ) -> str:
     """
-    Connects to the Gemini API and generates a response.
-    Includes retry logic, error handling, and performance optimization.
+    Connects to the Gemini API and generates a response with proper error handling.
     """
     if not MODEL:
-        if initialize_ai_model():
-            logging.info("Successfully re-initialized AI model")
-        else:
+        if not initialize_ai_model():
             logging.error(f"Gemini API initialization failed for user {user_id}")
             return (
                 "❌ <b>AI Service Unavailable</b>\n\n"
@@ -96,26 +77,28 @@ async def call_my_ai_api(
 
     try:
         # Input validation and truncation
+        truncation_notice = ""
         if len(new_prompt) > MAX_INPUT_CHARS:
             new_prompt = new_prompt[:MAX_INPUT_CHARS]
             truncation_notice = "\n\n<i>(Your message was truncated due to length limits)</i>"
-        else:
-            truncation_notice = ""
 
         # Prepare conversation with system prompt
         conversation = []
         
         # Add system instructions
-        system_instruction = f"{system_prompt}\n\nImportant: Keep responses concise but informative. Aim for less than 100 words unless more detail is specifically requested."
+        system_instruction = (
+            f"{system_prompt}\n\n"
+            "Important: Keep responses concise but informative. "
+            "Aim for less than 150 words unless more detail is specifically requested."
+        )
         
         conversation.append({
             "role": "user",
             "parts": [{"text": system_instruction}]
         })
         
-        # Add conversation history (only recent messages for performance)
+        # Add recent conversation history
         if history:
-            # Take only the most recent messages to reduce token usage
             recent_history = history[-MAX_HISTORY_MESSAGES:]
             conversation.extend(recent_history)
         
@@ -127,21 +110,19 @@ async def call_my_ai_api(
 
         # Multiple retries with exponential backoff
         max_retries = 3
-        last_error = None
         
         for attempt in range(max_retries):
             try:
                 # Generate response with timeout
                 response = await asyncio.wait_for(
                     MODEL.generate_content_async(conversation),
-                    timeout=30.0  # 30 second timeout
+                    timeout=30.0
                 )
                 
                 # Extract and validate response
                 if response and hasattr(response, 'text') and response.text:
                     response_text = response.text.strip()
                     
-                    # Add truncation notice if applicable
                     if truncation_notice:
                         response_text += truncation_notice
                     
@@ -149,13 +130,12 @@ async def call_my_ai_api(
                 
                 # Handle empty responses
                 if attempt < max_retries - 1:
-                    await asyncio.sleep(1)
+                    await asyncio.sleep(2 ** attempt)
                     continue
                 else:
                     raise ValueError("Empty response from AI model")
                 
             except asyncio.TimeoutError:
-                last_error = "Request timed out"
                 if attempt < max_retries - 1:
                     wait_time = (2 ** attempt)
                     logging.warning(
@@ -167,7 +147,6 @@ async def call_my_ai_api(
                     raise
                     
             except Exception as e:
-                last_error = str(e)
                 if attempt < max_retries - 1:
                     wait_time = (2 ** attempt)
                     logging.warning(
@@ -179,15 +158,14 @@ async def call_my_ai_api(
                     raise
 
     except asyncio.TimeoutError:
-        error_msg = "⏱️ <b>Response Timeout</b>\n\nThe AI took too long to respond. Please try a simpler question."
         logging.error(f"AI timeout for user {user_id}")
-        return error_msg
+        return "⏱️ <b>Response Timeout</b>\n\nThe AI took too long to respond. Please try a simpler question."
         
     except Exception as e:
         error_msg = str(e)
         logging.error(f"AI Error for user {user_id}: {error_msg}")
         
-        # Notify admin of critical errors (but don't spam)
+        # Notify admin of critical errors
         try:
             if "quota" in error_msg.lower() or "limit" in error_msg.lower():
                 await bot.send_message(
@@ -196,10 +174,10 @@ async def call_my_ai_api(
                     f"User: {user_id}\n"
                     f"Error: {error_msg[:300]}"
                 )
-        except Exception as notify_error:
-            logging.error(f"Failed to notify admin: {notify_error}")
+        except Exception:
+            pass
         
-        # User-friendly error messages based on error type
+        # User-friendly error messages
         if "quota" in error_msg.lower() or "resource" in error_msg.lower():
             return (
                 "❌ <b>Service Temporarily Unavailable</b>\n\n"
@@ -219,12 +197,12 @@ async def call_my_ai_api(
                 "Please try again or rephrase your question."
             )
 
-# --- 1. Trigger the AI Mode ---
-@router.message(F.text == "💬 Chat with Ai", StateFilter('*'))
+# --- 1. Trigger the AI Mode (FIXED: Added Command filter to prevent conflicts) ---
+@router.message(Command("ai"), StateFilter(None))
+@router.message(F.text == "💬 Chat with Ai", StateFilter(None))
 async def start_ai_chat(message: Message, state: FSMContext, db_pool):
-    """Start AI chat mode"""
+    """Start AI chat mode - ONLY when not in another state"""
     user_id = message.from_user.id
-    await user_queries.update_user_last_active(db_pool, user_id)
     
     user = await user_queries.get_user(db_pool, user_id)
     if not user:
@@ -277,8 +255,8 @@ async def start_ai_chat(message: Message, state: FSMContext, db_pool):
     
     await message.answer(welcome_message)
 
-# --- 2. Handle the user's AI prompt ---
-@router.message(UserFlow.AwaitingAIPrompt)
+# --- 2. Handle the user's AI prompt (FIXED: Better state handling and Redis error handling) ---
+@router.message(UserFlow.AwaitingAIPrompt, ~Command("stop"))
 async def handle_ai_prompt(
     message: Message, 
     state: FSMContext, 
@@ -286,7 +264,7 @@ async def handle_ai_prompt(
     bot: Bot, 
     ai_cache: Redis
 ):
-    """Process AI chat message"""
+    """Process AI chat message - ONLY in AI chat state"""
     user_id = message.from_user.id
     prompt = message.text
     
@@ -316,8 +294,8 @@ async def handle_ai_prompt(
         await state.clear()
         return
 
-    # --- Check Global Cache First ---
-    cache_key = f"ai_cache:{prompt.lower().strip()}"
+    # --- Check Global Cache First (WITH PROPER ERROR HANDLING) ---
+    cache_key = f"ai_cache:{prompt.lower().strip()[:100]}"  # Limit key length
     cached_response = None
     
     try:
@@ -330,13 +308,12 @@ async def handle_ai_prompt(
             )
             return
     except Exception as e:
-        logging.error(f"Redis cache GET error: {e}")
+        logging.warning(f"Redis cache GET error (non-fatal): {e}")
+        # Continue without cache - don't fail the request
 
     logging.info(f"❌ AI Cache MISS for user {user_id} - Calling AI API")
     
-    # --- Cache Miss: Call Real AI ---
-    
-    # 1. Decrement Limit (if not premium)
+    # --- Decrement Limit (if not premium) ---
     if not user.is_premium:
         success = await user_queries.decrement_ai_limit(db_pool, user_id)
         if not success:
@@ -348,21 +325,21 @@ async def handle_ai_prompt(
             await state.clear()
             return
         
-        # Get updated user to show remaining queries
+        # Get updated user
         user = await user_queries.get_user(db_pool, user_id)
             
-    # 2. Get data for AI
+    # --- Get data for AI ---
     fsm_data = await state.get_data()
     history = fsm_data.get("history", [])
     system_prompt = await ai_queries.get_ai_prompt(db_pool, user.selected_class)
 
-    # 3. Show typing indicator
+    # --- Show typing indicator ---
     await message.bot.send_chat_action(chat_id=user_id, action="typing")
     
-    # 4. Call AI
+    # --- Call AI ---
     ai_response = await call_my_ai_api(bot, user_id, system_prompt, history, prompt)
 
-    # 5. Send response to user
+    # --- Send response to user ---
     response_message = ai_response
     
     # Add remaining queries info for free users
@@ -373,26 +350,26 @@ async def handle_ai_prompt(
     
     await message.answer(response_message)
     
-    # 6. Update history
+    # --- Update history ---
     history.append({"role": "user", "parts": [{"text": prompt}]})
     history.append({"role": "model", "parts": [{"text": ai_response}]})
     
-    # 7. Trim history to prevent memory issues
-    if len(history) > MAX_HISTORY_MESSAGES:
-        history = history[-MAX_HISTORY_MESSAGES:]
+    # Trim history
+    if len(history) > MAX_HISTORY_MESSAGES * 2:  # *2 because we store both user and model
+        history = history[-MAX_HISTORY_MESSAGES * 2:]
         
     await state.update_data(history=history)
 
-    # 8. Save to global cache (only successful responses)
+    # --- Save to global cache (WITH PROPER ERROR HANDLING) ---
     if not ai_response.startswith("❌") and not ai_response.startswith("⚠️"):
         try:
             await ai_cache.set(cache_key, ai_response, ex=CACHE_EXPIRY)
             logging.info(f"✅ Cached AI response for query: {prompt[:50]}")
         except Exception as e:
-            logging.error(f"Redis cache SET error: {e}")
+            logging.warning(f"Redis cache SET error (non-fatal): {e}")
+            # Continue - caching failure shouldn't break the flow
     
     logging.info(
         f"User {user_id} AI query processed. "
         f"Remaining: {user.ai_limit_remaining if not user.is_premium else 'unlimited'}"
-    ) 
-     
+    )
