@@ -98,17 +98,24 @@ async def start_search(message: Message, state: FSMContext, db_pool):
         )
         return
     
-    # Check download limit for free users
-    if not user.is_premium and user.pdf_downloads_remaining <= 0:
-        await message.answer(
-            "❌ <b>PDF Download Limit Reached</b>\n\n"
-            "You have used all your free PDF downloads for this month.\n\n"
-            "💡 <b>Upgrade to Premium:</b>\n"
-            "• More PDF downloads per month\n"
-            "• Unlimited access to locked PDFs\n"
-            "• 100 AI queries per day\n\n"
-            "Use /upgrade to get premium access!"
-        )
+    # Check download limit for ALL users
+    if user.pdf_downloads_remaining <= 0:
+        if not user.is_premium:
+            await message.answer(
+                "❌ <b>PDF Download Limit Reached</b>\n\n"
+                "You have used all your free PDF downloads for this month.\n\n"
+                "💡 <b>Upgrade to Premium:</b>\n"
+                "• 50 PDF downloads per day\n"
+                "• Unlimited access to locked PDFs\n"
+                "• 100 AI queries per day\n\n"
+                "Use /upgrade to get premium access!"
+            )
+        else:
+            await message.answer(
+                "❌ <b>PDF Download Limit Reached</b>\n\n"
+                "You have used all your 50 premium PDF downloads for today.\n\n"
+                "Your limits will reset at midnight UTC."
+            )
         return
 
     # Set the state and ask for the query
@@ -121,7 +128,9 @@ async def start_search(message: Message, state: FSMContext, db_pool):
     )
     
     if not user.is_premium:
-        search_tips += f"<b>Downloads Remaining:</b> {user.pdf_downloads_remaining}/10\n"
+        search_tips += f"<b>Downloads Remaining:</b> {user.pdf_downloads_remaining}/10 (this month)\n"
+    else:
+        search_tips += f"<b>Downloads Remaining:</b> {user.pdf_downloads_remaining}/50 (today)\n"
     
     search_tips += (
         "\n<b>Search Tips:</b>\n"
@@ -332,27 +341,37 @@ async def send_pdf_link(callback: CallbackQuery, db_pool):
         await callback.answer("Error: User not found", show_alert=True)
         return
     
-    # --- Check download limit for free users ---
-    if not user.is_premium:
-        if user.pdf_downloads_remaining <= 0:
-            await callback.answer(
-                "❌ You are out of PDF downloads!\n\n"
-                "Use /upgrade to get  more downloads.",
-                show_alert=True
-            )
-            return
-        
-        # Decrement their limit
-        success = await user_queries.decrement_pdf_download_limit(db_pool, user_id)
-        if not success:
-            await callback.answer(
-                "❌ Download limit reached or error occurred.",
-                show_alert=True
-            )
-            return
+    # =======================================================
+    # === THIS IS THE MODIFIED BLOCK ===
+    # =======================================================
+
+    # --- Check download limit for ALL users ---
+    if user.pdf_downloads_remaining <= 0:
+        await callback.answer(
+            "❌ You are out of PDF downloads!\n\n"
+            "Your limits reset daily (Premium) or monthly (Free).\n"
+            "Use /upgrade to get more downloads.",
+            show_alert=True
+        )
+        return
+    
+    # Decrement their limit
+    success = await user_queries.decrement_pdf_download_limit(db_pool, user_id)
+    if not success:
+        await callback.answer(
+            "❌ Download limit reached or error occurred.",
+            show_alert=True
+        )
+        return
     
     # --- Get and send the PDF link ---
+    # This code now only runs if the decrement was successful
     pdf_id = int(callback.data.split(":")[1])
+    
+    # =======================================================
+    # === END OF MODIFIED BLOCK ===
+    # =======================================================
+    
     link = await pdf_queries.get_pdf_link_by_id(db_pool, pdf_id)
     
     if link:
@@ -366,11 +385,14 @@ async def send_pdf_link(callback: CallbackQuery, db_pool):
         
         if not updated_user.is_premium:
             download_msg += (
-                f"<b>Downloads Remaining:</b> {updated_user.pdf_downloads_remaining}/10\n\n"
+                f"<b>Downloads Remaining:</b> {updated_user.pdf_downloads_remaining}/10 (this month)\n\n"
                 "💡 Upgrade to premium for more downloads!"
             )
         else:
-            download_msg += "✨ Enjoying premium? Thank you for your support!"
+            download_msg += (
+                f"<b>Downloads Remaining:</b> {updated_user.pdf_downloads_remaining}/50 (today)\n\n"
+                "✨ Enjoying premium? Thank you for your support!"
+            )
         
         await callback.message.answer(
             download_msg,
@@ -383,7 +405,10 @@ async def send_pdf_link(callback: CallbackQuery, db_pool):
                 show_alert=False
             )
         else:
-            await callback.answer("✅ Link sent!", show_alert=False)
+            await callback.answer(
+                f"✅ Link sent! {updated_user.pdf_downloads_remaining} downloads left",
+                show_alert=False
+            )
         
         logging.info(f"User {user_id} downloaded PDF {pdf_id}")
     else:
@@ -393,5 +418,3 @@ async def send_pdf_link(callback: CallbackQuery, db_pool):
             show_alert=True
         )
         logging.error(f"PDF {pdf_id} not found in database")
-
-    

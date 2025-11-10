@@ -192,6 +192,17 @@ async def start_ai_chat(message: Message, state: FSMContext, db_pool):
         )
         return
 
+    # === THIS IS THE ONLY CHANGE IN THIS FUNCTION ===
+    # Check premium limit as well
+    if user.is_premium and user.ai_limit_remaining <= 0:
+        await message.answer(
+            "❌ <b>AI Limit Reached</b>\n\n"
+            "You have used all your 100 premium AI queries for today.\n\n"
+            "Your limits will reset at midnight UTC."
+        )
+        return
+    # === END OF CHANGE ===
+
     await state.set_state(UserFlow.AwaitingAIPrompt)
     await state.update_data(history=[])
     
@@ -206,6 +217,11 @@ async def start_ai_chat(message: Message, state: FSMContext, db_pool):
     )
     if not user.is_premium:
         welcome_message += f"<b>Queries Remaining Today:</b> {user.ai_limit_remaining}/10\n\n"
+    # === ADDED THIS ELSE ===
+    else:
+        welcome_message += f"<b>Queries Remaining Today:</b> {user.ai_limit_remaining}/100\n\n"
+    # === END OF CHANGE ===
+
     welcome_message += "<i>Ask me anything! Type /stop to exit chat mode.</i>"
     
     await message.answer(welcome_message)
@@ -262,22 +278,36 @@ async def process_ai_request_task(
             # We DON'T decrement the limit because it failed
             return
 
-        # --- Decrement Limit (if not premium) ---
+        # =======================================================
+        # === THIS IS THE MODIFIED BLOCK (Change 1 of 2) ===
+        # =======================================================
+        
+        # --- Decrement Limit (for ALL users) ---
         remaining_queries = user.ai_limit_remaining
-        if not user.is_premium:
-            success = await user_queries.decrement_ai_limit(db_pool, user_id)
-            if success:
-                remaining_queries -= 1
+        
+        # This now runs for EVERYONE
+        success = await user_queries.decrement_ai_limit(db_pool, user_id)
+        if success:
+            remaining_queries -= 1
         
         # --- Send response to user ---
         response_message = ai_response
         
+        # Show the correct limit to the user
         if not user.is_premium:
             response_message += (
                 f"\n\n<i>💬 Queries remaining today: {remaining_queries}/10</i>"
             )
+        else:
+            response_message += (
+                f"\n\n<i>💎 Queries remaining today: {remaining_queries}/100</i>"
+            )
         
         await message.reply(response_message) # Use .reply()
+        
+        # =======================================================
+        # === END OF MODIFIED BLOCK ===
+        # =======================================================
         
         # --- Update history ---
         history.append({"role": "user", "parts": [{"text": prompt}]})
@@ -297,7 +327,7 @@ async def process_ai_request_task(
         
         logging.info(
             f"User {user_id} AI query processed. "
-            f"Remaining: {remaining_queries if not user.is_premium else 'unlimited'}"
+            f"Remaining: {remaining_queries if not user.is_premium else remaining_queries}"
         )
     except Exception as e:
         # Catch-all for any error in the background task
@@ -308,7 +338,7 @@ async def process_ai_request_task(
             logging.error(f"Failed to even send error reply: {e_reply}")
 
 
-# <--- THIS IS THE MODIFIED, FAST HANDLER ---
+# <--- THIS IS THE MODIFIED, FAST HANDLER (Change 2 of 2) ---
 @router.message(UserFlow.AwaitingAIPrompt, ~Command("stop"))
 async def handle_ai_prompt(
     message: Message, 
@@ -352,12 +382,20 @@ async def handle_ai_prompt(
         return
 
     # --- 2. Check Limit (FAST) ---
-    if not user.is_premium and user.ai_limit_remaining <= 0:
-        await message.answer(
-            "❌ <b>AI Limit Reached</b>\n\n"
-            "You have used all your AI queries for today.\n"
-            "Use /upgrade for unlimited access!"
-        )
+    # This now checks BOTH premium and free limits
+    if user.ai_limit_remaining <= 0:
+        if not user.is_premium:
+            await message.answer(
+                "❌ <b>AI Limit Reached</b>\n\n"
+                "You have used all your AI queries for today.\n"
+                "Use /upgrade for unlimited access!"
+            )
+        else:
+             await message.answer(
+                "❌ <b>AI Limit Reached</b>\n\n"
+                "You have used all your 100 premium AI queries for today.\n"
+                "Your limits will reset at midnight UTC."
+            )
         await state.clear()
         return
             

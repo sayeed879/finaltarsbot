@@ -251,18 +251,30 @@ async def reset_daily_limits(pool: asyncpg.Pool) -> bool:
     """
     async with pool.acquire() as conn:
         try:
+            # =======================================================
+            # === THIS IS THE MODIFIED BLOCK ===
+            # =======================================================
             await conn.execute("""
             UPDATE users
             SET
                 ai_limit_remaining = CASE
                     WHEN is_premium = TRUE THEN 100
                     ELSE 10
+                END,
+                -- ADD THIS BLOCK TO RESET PDFS FOR PREMIUM USERS --
+                pdf_downloads_remaining = CASE
+                    WHEN is_premium = TRUE THEN 50
+                    ELSE pdf_downloads_remaining -- This leaves free users' PDF limits unchanged
                 END;
             """)
-            logging.info("SCHEDULER: Successfully reset daily AI limits for all users.")
+            # =======================================================
+            # === END OF MODIFIED BLOCK ===
+            # =======================================================
+            
+            logging.info("SCHEDULER: Successfully reset daily AI & PDF limits for all users.")
             return True
         except Exception as e:
-            logging.error(f"SCHEDULER: Error resetting daily AI limits: {e}")
+            logging.error(f"SCHEDULER: Error resetting daily limits: {e}")
             return False
 async def get_expired_premium_users(pool: asyncpg.Pool) -> List[int]:
     """
