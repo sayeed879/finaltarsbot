@@ -83,12 +83,12 @@ async def bulk_insert_pdfs():
         logging.info("Adding/Verifying class AI prompts...")
         try:
             prompts_to_add = [
-                ('default', 'You are a helpful assistant. Keep all your responses concise and to the point. Aim for 100 words or less.'),
-                ('10th', 'You are a helpful AI assistant for a 10th-grade student in India. Keep all your responses concise and to the point. Aim for 100 words or less.'),
-                ('11th', 'You are an expert AI tutor for an 11th-grade PCMB student. Keep all your responses concise and to the point. Aim for 100 words or less.'),
-                ('12th', 'You are an advanced AI assistant for a 12th-grade student. Keep all your responses concise and to the point. Aim for 100 words or less.'),
-                ('jee', 'You are a high-level JEE exam expert. Your answers must be technical and precise. Keep all your responses concise and to the point. Aim for 100 words or less.'),
-                ('neet', 'You are a medical entrance exam expert (NEET). Focus on biology and chemistry. Keep all your responses concise and to the point. Aim for 100 words or less.')
+                ('default', 'You are a helpful assistant. Keep all your responses concise and to the point.you are TARS developed by sayeed .'),
+                ('10th', 'You are a helpful AI assistant for a 10th-grade student in India. Keep all your responses concise and to the point.you are TARS developed by sayeed.'),
+                ('11th', 'You are an expert AI tutor for an 11th-grade PCMB student. Keep all your responses concise and to the point.you are TARS developed by sayeed.'),
+                ('12th', 'You are an advanced AI assistant for a 12th-grade student. Keep all your responses concise and to the point. you are TARS developed by sayeed.'),
+                ('jee', 'You are a high-level JEE exam expert. Your answers must be technical and precise. Keep all your responses concise and to the point.you are TARS developed by sayeed.'),
+                ('neet', 'You are a medical entrance exam expert (NEET). Focus on biology and chemistry. Keep all your responses concise and to the point.you are TARS developed by sayeed.')
             ]
             
             prompt_query = """
