@@ -23,8 +23,11 @@ async def run_daily_tasks():
     bot = None
     
     try:
-        # --- 1. Connect to Database ---
-        db_pool = await asyncpg.create_pool(DATABASE_URL)
+        # --- 1. Connect to Database (WITH SSL FIX) ---
+        db_pool = await asyncpg.create_pool(
+            DATABASE_URL,
+            ssl='require' # <-- THIS IS THE FIX
+        )
         if db_pool:
             logging.info("Successfully connected to database.")
         else:
@@ -73,8 +76,8 @@ async def run_daily_tasks():
                 else:
                     logging.error(f"Failed to reset PDF downloads for free user {user_id}.")
 
-        # --- 5. Reset Daily AI Limits ---
-        logging.info("Resetting daily AI limits for all users...")
+        # --- 5. Reset Daily AI & PDF Limits ---
+        logging.info("Resetting daily AI & PDF limits for all users...")
         if await user_queries.reset_daily_limits(db_pool):
             logging.info("Successfully reset all daily limits.")
         else:
